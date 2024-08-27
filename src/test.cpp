@@ -36,7 +36,7 @@ const char testHexAbi[] = "0E656F73696F3A3A6162692F312E3100040273310001027831046
                           "02623107696E74385B5D240000000000010276310304696E7438027331027332";
 
 const char testAbi[] = R"({
-    "version": "eosio::abi/1.1",
+    "version": "sysio::abi/1.1",
     "structs": [
         {
             "name": "s1",
@@ -134,7 +134,7 @@ const char testAbi[] = R"({
 })";
 
 const char transactionAbi[] = R"({
-    "version": "eosio::abi/1.0",
+    "version": "sysio::abi/1.0",
     "types": [
         {
             "new_type_name": "account_name",
@@ -252,7 +252,7 @@ const char transactionAbi[] = R"({
 })";
 
 const char testKvTablesAbi[] = R"({
-    "version": "eosio::abi/1.2",
+    "version": "sysio::abi/1.2",
     "types": [],
     "structs": [
         {
@@ -372,7 +372,7 @@ const char testKvTablesAbi[] = R"({
 })";
 
 const char packedTransactionAbi[] = R"({
-    "version": "eosio::abi/1.0",
+    "version": "sysio::abi/1.0",
     "types": [
         {
             "new_type_name": "account_name",
@@ -576,7 +576,7 @@ void check_error(abieos_context* context, const std::string& s, F f) {
 
 void check_types() {
     auto context = check(abieos_create());
-    auto token = check_context(context, abieos_string_to_name(context, "eosio.token"));
+    auto token = check_context(context, abieos_string_to_name(context, "sysio.token"));
     auto testAbiName = check_context(context, abieos_string_to_name(context, "test.abi"));
     auto testHexAbiName = check_context(context, abieos_string_to_name(context, "test.hex"));
     auto testKvAbiName = check_context(context, abieos_string_to_name(context, "testkv.abi"));
@@ -589,8 +589,8 @@ void check_types() {
     check_context(context, abieos_set_abi(context, testKvAbiName, testKvTablesAbi));
 
     int next_id = 0;
-    auto write_corpus = [&](bool abi_is_bin, uint8_t operation, uint64_t contract, eosio::input_stream abi,
-                            eosio::input_stream type, eosio::input_stream data) {
+    auto write_corpus = [&](bool abi_is_bin, uint8_t operation, uint64_t contract, sysio::input_stream abi,
+                            sysio::input_stream type, sysio::input_stream data) {
         fuzzer_header header;
         header.abi_is_bin = abi_is_bin;
         header.operation = operation;
@@ -658,16 +658,16 @@ void check_types() {
     check_error(context, "no data", [&] { return abieos_set_abi_hex(context, 8, ""); });
     check_error(context, "unsupported abi version", [&] { return abieos_set_abi_hex(context, 8, "00"); });
     check_error(context, "unsupported abi version",
-                [&] { return abieos_set_abi_hex(context, 8, string_to_hex("eosio::abi/9.0").c_str()); });
+                [&] { return abieos_set_abi_hex(context, 8, string_to_hex("sysio::abi/9.0").c_str()); });
     check_error(context, "Stream overrun",
-                [&] { return abieos_set_abi_hex(context, 8, string_to_hex("eosio::abi/1.0").c_str()); });
+                [&] { return abieos_set_abi_hex(context, 8, string_to_hex("sysio::abi/1.0").c_str()); });
     check_error(context, "Stream overrun",
-                [&] { return abieos_set_abi_hex(context, 8, string_to_hex("eosio::abi/1.1").c_str()); });
+                [&] { return abieos_set_abi_hex(context, 8, string_to_hex("sysio::abi/1.1").c_str()); });
 
     check_error(context, "unsupported abi version",
-                [&] { return abieos_set_abi(context, 8, R"({"version":"eosio::abi/9.0"})"); });
-    abieos_set_abi(context, 8, R"({"version":"eosio::abi/1.0"})");
-    abieos_set_abi(context, 8, R"({"version":"eosio::abi/1.1"})");
+                [&] { return abieos_set_abi(context, 8, R"({"version":"sysio::abi/9.0"})"); });
+    abieos_set_abi(context, 8, R"({"version":"sysio::abi/1.0"})");
+    abieos_set_abi(context, 8, R"({"version":"sysio::abi/1.1"})");
 
     check_type(context, 0, "bool", R"(true)");
     check_type(context, 0, "bool", R"(false)");
@@ -972,7 +972,7 @@ void check_types() {
                R"({"from":"useraaaaaaaa","to":"useraaaaaaab","quantity":"0.0001 SYS","memo":"test memo"})");
     check_type(
         context, 0, "transaction",
-        R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})");
+        R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"sysio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})");
 
     check_type( //
         context, token, "transfer",
@@ -980,15 +980,15 @@ void check_types() {
         R"({"from":"useraaaaaaaa","to":"useraaaaaaab","quantity":"0.0001 SYS","memo":"test memo"})", false);
     check_type(
         context, 0, "transaction",
-        R"({"ref_block_num":1234,"ref_block_prefix":5678,"expiration":"2009-02-13T23:31:31.000","max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
-        R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
+        R"({"ref_block_num":1234,"ref_block_prefix":5678,"expiration":"2009-02-13T23:31:31.000","max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"sysio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
+        R"({"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"sysio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]})",
         false);
     check_type(
         context, 1, "packed_transaction_v0",
-        R"({"signatures":["SIG_K1_K5PGhrkUBkThs8zdTD9mGUJZvxL4eU46UjfYJSEdZ9PXS2Cgv5jAk57yTx4xnrdSocQm6DDvTaEJZi5WLBsoZC4XYNS8b3"],"compression":0,"packed_context_free_data":"","packed_trx":{"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"eosio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]}})");
+        R"({"signatures":["SIG_K1_K5PGhrkUBkThs8zdTD9mGUJZvxL4eU46UjfYJSEdZ9PXS2Cgv5jAk57yTx4xnrdSocQm6DDvTaEJZi5WLBsoZC4XYNS8b3"],"compression":0,"packed_context_free_data":"","packed_trx":{"expiration":"2009-02-13T23:31:31.000","ref_block_num":1234,"ref_block_prefix":5678,"max_net_usage_words":0,"max_cpu_usage_ms":0,"delay_sec":0,"context_free_actions":[],"actions":[{"account":"sysio.token","name":"transfer","authorization":[{"actor":"useraaaaaaaa","permission":"active"}],"data":"608C31C6187315D6708C31C6187315D60100000000000000045359530000000000"}],"transaction_extensions":[]}})");
     check_type(
         context, 2, "transaction_trace",
-        R"(["transaction_trace_v0",{"id":"3098EA9476266BFA957C13FA73C26806D78753099CE8DEF2A650971F07595A69","status":0,"cpu_usage_us":2000,"net_usage_words":25,"elapsed":"194","net_usage":"200","scheduled":false,"action_traces":[["action_trace_v1",{"action_ordinal":1,"creator_action_ordinal":0,"receipt":["action_receipt_v0",{"receiver":"eosio","act_digest":"F2FDEEFF77EFC899EED23EE05F9469357A096DC3083D493571CF68A422C69EFE","global_sequence":"11","recv_sequence":"11","auth_sequence":[{"account":"eosio","sequence":"11"}],"code_sequence":2,"abi_sequence":0}],"receiver":"eosio","act":{"account":"eosio","name":"newaccount","authorization":[{"actor":"eosio","permission":"active"}],"data":"0000000000EA305500409406A888CCA501000000010002C0DED2BC1F1305FB0FAAC5E6C03EE3A1924234985427B6167CA569D13DF435CF0100000001000000010002C0DED2BC1F1305FB0FAAC5E6C03EE3A1924234985427B6167CA569D13DF435CF01000000"},"context_free":false,"elapsed":"83","console":"","account_ram_deltas":[{"account":"oracle.aml","delta":"2724"}],"except":null,"error_code":null,"return_value":""}]],"account_ram_delta":null,"except":null,"error_code":null,"failed_dtrx_trace":null,"partial":null}])");
+        R"(["transaction_trace_v0",{"id":"3098EA9476266BFA957C13FA73C26806D78753099CE8DEF2A650971F07595A69","status":0,"cpu_usage_us":2000,"net_usage_words":25,"elapsed":"194","net_usage":"200","scheduled":false,"action_traces":[["action_trace_v1",{"action_ordinal":1,"creator_action_ordinal":0,"receipt":["action_receipt_v0",{"receiver":"sysio","act_digest":"F2FDEEFF77EFC899EED23EE05F9469357A096DC3083D493571CF68A422C69EFE","global_sequence":"11","recv_sequence":"11","auth_sequence":[{"account":"sysio","sequence":"11"}],"code_sequence":2,"abi_sequence":0}],"receiver":"sysio","act":{"account":"sysio","name":"newaccount","authorization":[{"actor":"sysio","permission":"active"}],"data":"0000000000EA305500409406A888CCA501000000010002C0DED2BC1F1305FB0FAAC5E6C03EE3A1924234985427B6167CA569D13DF435CF0100000001000000010002C0DED2BC1F1305FB0FAAC5E6C03EE3A1924234985427B6167CA569D13DF435CF01000000"},"context_free":false,"elapsed":"83","console":"","account_ram_deltas":[{"account":"oracle.aml","delta":"2724"}],"except":null,"error_code":null,"return_value":""}]],"account_ram_delta":null,"except":null,"error_code":null,"failed_dtrx_trace":null,"partial":null}])");
 
     check_error(context, "recursion limit reached", [&] {
         return abieos_json_to_bin_reorderable(
@@ -1013,16 +1013,16 @@ void check_types() {
 
     check_error(context, "abi has a type with a missing name", [&] {
         return abieos_set_abi( //
-            context, 0, R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"","type":"int8"}]})");
+            context, 0, R"({"version":"sysio::abi/1.1","types":[{"new_type_name":"","type":"int8"}]})");
     });
     check_error(context, "can't use extensions ($) within typedefs", [&] {
         return abieos_set_abi( //
-            context, 0, R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"a","type":"int8$"}]})");
+            context, 0, R"({"version":"sysio::abi/1.1","types":[{"new_type_name":"a","type":"int8$"}]})");
     });
     check_error(context, "abi redefines type \"a\"", [&] {
         return abieos_set_abi(
             context, 0,
-            R"({"version":"eosio::abi/1.1","types":[{"new_type_name":"a","type":"int8"},{"new_type_name":"a","type":"int8"}]})");
+            R"({"version":"sysio::abi/1.1","types":[{"new_type_name":"a","type":"int8"},{"new_type_name":"a","type":"int8"}]})");
     });
 
     check_error(context, "expected object", [&] { return abieos_json_to_bin(context, testAbiName, "s4", "null"); });
@@ -1218,13 +1218,13 @@ void check_types() {
             throw std::runtime_error(std::string{msg} + " capacity test failed");
     };
 
-    check_checksum_capacity(eosio::checksum160(), 20, "checksum160");
-    check_checksum_capacity(eosio::checksum256(), 32, "checksum256");
-    check_checksum_capacity(eosio::checksum512(), 64, "checksum512");
+    check_checksum_capacity(sysio::checksum160(), 20, "checksum160");
+    check_checksum_capacity(sysio::checksum256(), 32, "checksum256");
+    check_checksum_capacity(sysio::checksum512(), 64, "checksum512");
 
-    check_checksum_capacity(eosio::checksum160({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 20, "checksum160");
-    check_checksum_capacity(eosio::checksum256({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 32, "checksum256");
-    check_checksum_capacity(eosio::checksum512({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 64, "checksum512");
+    check_checksum_capacity(sysio::checksum160({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 20, "checksum160");
+    check_checksum_capacity(sysio::checksum256({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 32, "checksum256");
+    check_checksum_capacity(sysio::checksum512({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 64, "checksum512");
 
     abieos_destroy(context);
 }

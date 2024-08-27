@@ -4,7 +4,7 @@
 #include "stream.hpp"
 #include "types.hpp"
 
-namespace eosio {
+namespace sysio {
 
 ///
 /// opaque<T> type provides a type safe alternative to input_stream to declare a field
@@ -59,7 +59,7 @@ class opaque_base {
    /**
     * @pre !this->empty()
     */
-   [[deprecated("Use unpack() free function instead.")]] void unpack(T& obj) { eosio::from_bin(obj, bin); }
+   [[deprecated("Use unpack() free function instead.")]] void unpack(T& obj) { sysio::from_bin(obj, bin); }
 
    /**
     *   @pre !this->empty()
@@ -75,12 +75,12 @@ class opaque_base {
 
    template <typename S>
    void from(S& stream) {
-      eosio::from_bin(this->bin, stream);
+      sysio::from_bin(this->bin, stream);
    }
 
    template <typename S>
    void to_bin(S& stream) const {
-      eosio::to_bin(this->bin, stream);
+      sysio::to_bin(this->bin, stream);
    }
 
    input_stream get() const { return bin; }
@@ -114,7 +114,7 @@ class opaque<std::vector<T>> : public opaque_base<std::vector<T>> {
    }
 
    [[deprecated("Use for_each() or loop_until() free function instead.")]] void unpack_next(T& obj) {
-      eosio::from_bin(obj, this->bin);
+      sysio::from_bin(obj, this->bin);
    }
 
    [[deprecated("Use for_each() or loop_until() free function instead.")]] T unpack_next() {
@@ -154,7 +154,7 @@ std::enable_if_t<std::is_base_of_v<U, T>, bool> unpack(opaque<T> opq, U& obj) {
    if (opq.empty())
       return false;
    input_stream bin = opq.get();
-   eosio::from_bin(obj, bin);
+   sysio::from_bin(obj, bin);
    return true;
 }
 
@@ -167,7 +167,7 @@ void loop_until(opaque<std::vector<T>> opq, Predicate&& f) {
    varuint64_from_bin(num, bin);
    for (uint64_t i = 0; i < num; ++i) {
       T obj;
-      eosio::from_bin(obj, bin);
+      sysio::from_bin(obj, bin);
       if (f(std::move(obj)))
          return;
    }
@@ -181,4 +181,4 @@ void for_each(opaque<std::vector<T>> opq, UnaryFunction&& f) {
    });
 }
 
-} // namespace eosio
+} // namespace sysio

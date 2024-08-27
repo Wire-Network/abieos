@@ -11,7 +11,7 @@
 #include <variant>
 #include <map>
 
-namespace eosio {
+namespace sysio {
 
 inline constexpr char hex_digits[] = "0123456789ABCDEF";
 
@@ -258,7 +258,7 @@ template <typename T, typename S>
 void to_json(const T& t, S& stream) {
    bool         first = true;
    stream.write('{');
-   eosio::for_each_field<T>([&](const char* name, auto&& member) {
+   sysio::for_each_field<T>([&](const char* name, auto&& member) {
        auto addfield = [&]() {
          if (first) {
             increase_indent(stream);
@@ -301,7 +301,7 @@ void to_json_hex(const char* data, size_t size, S& stream) {
    stream.write('"');
 }
 
-#ifdef __eosio_cdt__
+#ifdef __sysio_cdt__
 
 template <typename S> void to_json(long double value, S& stream) {
    return to_json_hex(reinterpret_cast<const char*>(&value), sizeof(long double), stream);
@@ -331,4 +331,4 @@ std::string format_json(const T& t) {
    return result;
 }
 
-} // namespace eosio
+} // namespace sysio

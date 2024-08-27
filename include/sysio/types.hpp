@@ -7,7 +7,7 @@
 #include <variant>
 #include <vector>
 
-namespace eosio {
+namespace sysio {
 
 constexpr const char* get_type_name(bool*) { return "bool"; }
 constexpr const char* get_type_name(std::int8_t*) { return "int8"; }
@@ -27,7 +27,7 @@ constexpr const char* get_type_name(__int128*) { return "int128"; }
 constexpr const char* get_type_name(unsigned __int128*) { return "uint128"; }
 #endif
 
-#ifdef __eosio_cdt__
+#ifdef __sysio_cdt__
 constexpr const char* get_type_name(long double*) { return "float128"; }
 #endif
 
@@ -89,7 +89,7 @@ constexpr auto get_variant_type_name() {
 template <typename... T>
 constexpr auto variant_type_name = get_variant_type_name<T...>();
 
-} // namespace eosio
+} // namespace sysio
 
 namespace std {
 // For all the types defined in ship_protocal.hpp, it relies on the argument-dependent name lookup
@@ -98,6 +98,6 @@ namespace std {
 // in the std namespace.
 template <typename... T>
 constexpr const char* get_type_name(std::variant<T...>*) {
-   return eosio::variant_type_name<T...>.data();
+   return sysio::variant_type_name<T...>.data();
 }
 }

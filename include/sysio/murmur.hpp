@@ -1,5 +1,5 @@
   
-namespace eosio {
+namespace sysio {
 namespace {
   inline constexpr uint64_t unaligned_load(const char* p)
   {
@@ -52,4 +52,4 @@ namespace {
     hash = shift_mix(hash);
     return hash;
   }
-} // namespace eosio
+} // namespace sysio

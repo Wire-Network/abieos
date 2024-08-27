@@ -15,7 +15,7 @@
 #include "bytes.hpp"
 #include "asset.hpp"
 
-namespace eosio {
+namespace sysio {
 
 enum class abi_error {
    no_error,
@@ -30,7 +30,7 @@ enum class abi_error {
    bad_abi
 };
 
-constexpr inline std::string_view convert_abi_error(eosio::abi_error e) {
+constexpr inline std::string_view convert_abi_error(sysio::abi_error e) {
    switch (e) {
       case abi_error::no_error: return "No error";
       case abi_error::recursion_limit_reached: return "Recursion limit reached";
@@ -80,14 +80,14 @@ struct type_def {
    std::string type{};
 };
 
-EOSIO_REFLECT(type_def, new_type_name, type);
+SYSIO_REFLECT(type_def, new_type_name, type);
 
 struct field_def {
    std::string name{};
    std::string type{};
 };
 
-EOSIO_REFLECT(field_def, name, type);
+SYSIO_REFLECT(field_def, name, type);
 
 struct struct_def {
    std::string            name{};
@@ -95,66 +95,66 @@ struct struct_def {
    std::vector<field_def> fields{};
 };
 
-EOSIO_REFLECT(struct_def, name, base, fields);
+SYSIO_REFLECT(struct_def, name, base, fields);
 
 struct action_def {
-   eosio::name name{};
+   sysio::name name{};
    std::string type{};
    std::string ricardian_contract{};
 };
 
-EOSIO_REFLECT(action_def, name, type, ricardian_contract);
+SYSIO_REFLECT(action_def, name, type, ricardian_contract);
 
 struct table_def {
-   eosio::name              name{};
+   sysio::name              name{};
    std::string              index_type{};
    std::vector<std::string> key_names{};
    std::vector<std::string> key_types{};
    std::string              type{};
 };
 
-EOSIO_REFLECT(table_def, name, index_type, key_names, key_types, type);
+SYSIO_REFLECT(table_def, name, index_type, key_names, key_types, type);
 
 struct clause_pair {
    std::string id{};
    std::string body{};
 };
 
-EOSIO_REFLECT(clause_pair, id, body);
+SYSIO_REFLECT(clause_pair, id, body);
 
 struct error_message {
    uint64_t    error_code{};
    std::string error_msg{};
 };
 
-EOSIO_REFLECT(error_message, error_code, error_msg);
+SYSIO_REFLECT(error_message, error_code, error_msg);
 
 struct variant_def {
    std::string              name{};
    std::vector<std::string> types{};
 };
 
-EOSIO_REFLECT(variant_def, name, types);
+SYSIO_REFLECT(variant_def, name, types);
 
 struct action_result_def {
-   eosio::name name{};
+   sysio::name name{};
    std::string result_type{};
 };
 
-EOSIO_REFLECT(action_result_def, name, result_type);
+SYSIO_REFLECT(action_result_def, name, result_type);
 
 struct primary_key_index_def {
-   eosio::name name{};
+   sysio::name name{};
    std::string type;
 };
 
-EOSIO_REFLECT(primary_key_index_def, name, type);
+SYSIO_REFLECT(primary_key_index_def, name, type);
 
 struct secondary_index_def {
    std::string type;
 };
 
-EOSIO_REFLECT(secondary_index_def, type);
+SYSIO_REFLECT(secondary_index_def, type);
 
 struct abi_def {
    std::string                                                version{};
@@ -169,7 +169,7 @@ struct abi_def {
    might_not_exist<std::vector<action_result_def>>            action_results{};
 };
 
-EOSIO_REFLECT(abi_def, version, types, structs, actions, tables, ricardian_clauses, error_messages, abi_extensions,
+SYSIO_REFLECT(abi_def, version, types, structs, actions, tables, ricardian_clauses, error_messages, abi_extensions,
               variants, action_results);
 
 struct abi_type;
@@ -243,10 +243,10 @@ struct abi_type {
 };
 
 struct abi {
-   std::map<eosio::name, std::string> action_types;
-   std::map<eosio::name, std::string> table_types;
+   std::map<sysio::name, std::string> action_types;
+   std::map<sysio::name, std::string> table_types;
    std::map<std::string, abi_type>    abi_types;
-   std::map<eosio::name, std::string> action_result_types;
+   std::map<sysio::name, std::string> action_result_types;
    const abi_type*                    get_type(const std::string& name);
 
    // Adds a type to the abi.  Has no effect if the type is already present.
@@ -351,7 +351,7 @@ abi_type* add_type(abi& a, might_not_exist<T>*) {
 
 template <typename T>
 abi_type* abi::add_type() {
-   using eosio::add_type;
+   using sysio::add_type;
    return add_type(*this, (T*)nullptr);
 }
 
@@ -379,4 +379,4 @@ void to_json(const abi_def& def, S& stream) {
    to_json_write_helper(def.action_results.value, "action_results", true, stream);
    stream.write('}');
 }
-} // namespace eosio
+} // namespace sysio

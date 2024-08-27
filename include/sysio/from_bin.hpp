@@ -13,7 +13,7 @@
 #include <vector>
 #include <string_view>
 
-namespace eosio {
+namespace sysio {
 
 template <typename T, typename S>
 void from_bin(T& obj, S& stream);
@@ -269,4 +269,4 @@ T convert_from_bin(const std::vector<char>& bin) {
    return obj;
 }
 
-} // namespace eosio
+} // namespace sysio

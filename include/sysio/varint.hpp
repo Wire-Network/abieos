@@ -9,7 +9,7 @@
 #include "to_bin.hpp"
 #include "to_json.hpp"
 
-namespace eosio {
+namespace sysio {
 /**
  * @defgroup varint Variable Length Integer Type
  * @ingroup core
@@ -202,7 +202,7 @@ struct unsigned_int {
 };
 
 using varuint32 = unsigned_int;
-EOSIO_REFLECT(varuint32, value);
+SYSIO_REFLECT(varuint32, value);
 
 template <typename F>
 void convert(const varuint32& src, uint32_t& dst, F&& chooser) {
@@ -422,7 +422,7 @@ struct signed_int {
 };
 
 using varint32 = signed_int;
-EOSIO_REFLECT(varint32, value);
+SYSIO_REFLECT(varint32, value);
 
 template <typename S>
 void from_bin(varint32& obj, S& stream) {
@@ -449,4 +449,4 @@ void to_key(const varint32& obj, S& stream) {
    return to_key_varint32(obj.value, stream);
 }
 
-} // namespace eosio
+} // namespace sysio

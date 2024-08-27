@@ -3,7 +3,7 @@
 #include "map_macro.h"
 #include <type_traits>
 
-namespace eosio { namespace reflection {
+namespace sysio { namespace reflection {
 
    template <typename T>
    struct has_for_each_field {
@@ -14,7 +14,7 @@ namespace eosio { namespace reflection {
       };
 
       template <typename C>
-      static char test(decltype(eosio_for_each_field((C*)nullptr, std::declval<F>()))*);
+      static char test(decltype(sysio_for_each_field((C*)nullptr, std::declval<F>()))*);
 
       template <typename C>
       static long test(...);
@@ -26,36 +26,36 @@ namespace eosio { namespace reflection {
    template <typename T>
    inline constexpr bool has_for_each_field_v = has_for_each_field<T>::value;
 
-#define EOSIO_REFLECT_MEMBER(STRUCT, FIELD)                                                                            \
+#define SYSIO_REFLECT_MEMBER(STRUCT, FIELD)                                                                            \
    f(#FIELD, [](auto p) -> decltype(&std::decay_t<decltype(*p)>::FIELD) { return &std::decay_t<decltype(*p)>::FIELD; });
 
-#define EOSIO_REFLECT_STRIP_BASEbase
-#define EOSIO_REFLECT_BASE(STRUCT, BASE)                                                                               \
-   static_assert(std::is_base_of_v<EOSIO_REFLECT_STRIP_BASE##BASE, STRUCT>, #BASE " is not a base class of " #STRUCT); \
-   eosio_for_each_field((EOSIO_REFLECT_STRIP_BASE##BASE*)nullptr, f);
+#define SYSIO_REFLECT_STRIP_BASEbase
+#define SYSIO_REFLECT_BASE(STRUCT, BASE)                                                                               \
+   static_assert(std::is_base_of_v<SYSIO_REFLECT_STRIP_BASE##BASE, STRUCT>, #BASE " is not a base class of " #STRUCT); \
+   sysio_for_each_field((SYSIO_REFLECT_STRIP_BASE##BASE*)nullptr, f);
 
-#define EOSIO_REFLECT_SIGNATURE(STRUCT, ...)                                                                           \
+#define SYSIO_REFLECT_SIGNATURE(STRUCT, ...)                                                                           \
    [[maybe_unused]] inline constexpr const char* get_type_name(STRUCT*) { return #STRUCT; }                                      \
    template <typename F>                                                                                               \
-   constexpr void eosio_for_each_field(STRUCT*, F f)
+   constexpr void sysio_for_each_field(STRUCT*, F f)
 
 /**
- * EOSIO_REFLECT(<struct>, <member or base spec>...)
+ * SYSIO_REFLECT(<struct>, <member or base spec>...)
  * Each parameter should be either the keyword 'base' followed by a base class of the struct or
  * an identifier which names a non-static data member of the struct.
  */
-#define EOSIO_REFLECT(...)                                                                                             \
-   EOSIO_REFLECT_SIGNATURE(__VA_ARGS__) { EOSIO_MAP_REUSE_ARG0(EOSIO_REFLECT_INTERNAL, __VA_ARGS__) }
+#define SYSIO_REFLECT(...)                                                                                             \
+   SYSIO_REFLECT_SIGNATURE(__VA_ARGS__) { SYSIO_MAP_REUSE_ARG0(SYSIO_REFLECT_INTERNAL, __VA_ARGS__) }
 
 // Identity the keyword 'base' followed by at least one token
-#define EOSIO_REFLECT_SELECT_I(a, b, c, d, ...) EOSIO_REFLECT_##d
-#define EOSIO_REFLECT_IS_BASE() ~, ~
-#define EOSIO_REFLECT_IS_BASE_TESTbase ~, EOSIO_REFLECT_IS_BASE
+#define SYSIO_REFLECT_SELECT_I(a, b, c, d, ...) SYSIO_REFLECT_##d
+#define SYSIO_REFLECT_IS_BASE() ~, ~
+#define SYSIO_REFLECT_IS_BASE_TESTbase ~, SYSIO_REFLECT_IS_BASE
 
-#define EOSIO_APPLY(m, x) m x
-#define EOSIO_CAT(x, y) x##y
-#define EOSIO_REFLECT_INTERNAL(STRUCT, FIELD)                                                                          \
-   EOSIO_APPLY(EOSIO_REFLECT_SELECT_I, (EOSIO_CAT(EOSIO_REFLECT_IS_BASE_TEST, FIELD()), MEMBER, BASE, MEMBER))         \
+#define SYSIO_APPLY(m, x) m x
+#define SYSIO_CAT(x, y) x##y
+#define SYSIO_REFLECT_INTERNAL(STRUCT, FIELD)                                                                          \
+   SYSIO_APPLY(SYSIO_REFLECT_SELECT_I, (SYSIO_CAT(SYSIO_REFLECT_IS_BASE_TEST, FIELD()), MEMBER, BASE, MEMBER))         \
    (STRUCT, FIELD)
 
-}} // namespace eosio::reflection
+}} // namespace sysio::reflection

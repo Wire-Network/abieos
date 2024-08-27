@@ -3,7 +3,7 @@
 #include "stream.hpp"
 #include <string_view>
 
-namespace eosio {
+namespace sysio {
 
 template <typename T, typename S>
 T from_string(S& stream) {
@@ -25,4 +25,4 @@ T convert_from_string(std::string_view s) {
    return obj;
 }
 
-} // namespace eosio
+} // namespace sysio

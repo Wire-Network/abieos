@@ -8,7 +8,7 @@
 #include <variant>
 #include <vector>
 
-namespace eosio {
+namespace sysio {
 struct no_conversion {
    using reverse = no_conversion;
 };
@@ -92,4 +92,4 @@ template <typename F>
 void convert(const input_stream& src, std::vector<char>& dst, F&& chooser) {
    dst.assign(src.pos, src.end);
 }
-} // namespace eosio
+} // namespace sysio

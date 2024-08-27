@@ -8,7 +8,7 @@
 #include <vector>
 #include <array>
 
-namespace eosio {
+namespace sysio {
 
 /**
  *  @defgroup public_key Public Key Type
@@ -18,7 +18,7 @@ namespace eosio {
  */
 
 /**
- *  EOSIO ECC public key data
+ *  SYSIO ECC public key data
  *
  *  Fixed size representation of either a K1 or R1 compressed public key
 
@@ -27,7 +27,7 @@ namespace eosio {
 using ecc_public_key = std::array<char, 33>;
 
 /**
- *  EOSIO WebAuthN public key
+ *  SYSIO WebAuthN public key
  *
  *  @ingroup public_key
  */
@@ -55,11 +55,11 @@ struct webauthn_public_key {
     */
    std::string rpid;
 };
-EOSIO_REFLECT(webauthn_public_key, key, user_presence, rpid);
-EOSIO_COMPARE(webauthn_public_key);
+SYSIO_REFLECT(webauthn_public_key, key, user_presence, rpid);
+SYSIO_COMPARE(webauthn_public_key);
 
 /**
- *  EOSIO Public Key
+ *  SYSIO Public Key
  *
  *  A public key is a variant of
  *   0 : a ECC K1 public key
@@ -74,7 +74,7 @@ using ecc_private_key = std::array<char, 32>;
 using private_key     = std::variant<ecc_private_key, ecc_private_key>;
 
 /**
- *  EOSIO ECC signature data
+ *  SYSIO ECC signature data
  *
  *  Fixed size representation of either a K1 or R1 ECC compact signature
 
@@ -101,8 +101,8 @@ struct webauthn_signature {
    std::string client_json;
 };
 
-EOSIO_REFLECT(webauthn_signature, compact_signature, auth_data, client_json);
-EOSIO_COMPARE(webauthn_signature);
+SYSIO_REFLECT(webauthn_signature, compact_signature, auth_data, client_json);
+SYSIO_COMPARE(webauthn_signature);
 
 using signature = std::variant<ecc_signature, ecc_signature, webauthn_signature>;
 constexpr const char* get_type_name(public_key*) { return "public_key"; }
@@ -145,4 +145,4 @@ void from_json(signature& obj, S& stream) {
 std::string to_base58(const char* d, size_t s );
 std::vector<char> from_base58(const std::string_view& s);
 
-} // namespace eosio
+} // namespace sysio

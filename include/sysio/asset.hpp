@@ -8,7 +8,7 @@
 #include <limits>
 #include <tuple>
 
-namespace eosio {
+namespace sysio {
 
 char* write_decimal(char* begin, char* end, bool dry_run, uint64_t number, uint8_t num_decimal_places, bool negative);
 
@@ -32,7 +32,7 @@ struct asset {
    /**
     * The symbol name of the asset
     */
-   eosio::symbol symbol;
+   sysio::symbol symbol;
 
    /**
     * Maximum amount possible for this asset. It's capped to 2^62 - 1
@@ -48,8 +48,8 @@ struct asset {
     * @param s - The name of the symbol
     */
    asset(int64_t a, class symbol s) : amount(a), symbol{ s } {
-      eosio::check(is_amount_within_range(), "magnitude of asset amount must be less than 2^62");
-      eosio::check(symbol.is_valid(), "invalid symbol name");
+      sysio::check(is_amount_within_range(), "magnitude of asset amount must be less than 2^62");
+      sysio::check(symbol.is_valid(), "invalid symbol name");
    }
 
    /**
@@ -75,7 +75,7 @@ struct asset {
     */
    void set_amount(int64_t a) {
       amount = a;
-      eosio::check(is_amount_within_range(), "magnitude of asset amount must be less than 2^62");
+      sysio::check(is_amount_within_range(), "magnitude of asset amount must be less than 2^62");
    }
 
    /// @cond OPERATORS
@@ -99,10 +99,10 @@ struct asset {
     * @post The amount of this asset is subtracted by the amount of asset a
     */
    asset& operator-=(const asset& a) {
-      eosio::check(a.symbol == symbol, "attempt to subtract asset with different symbol");
+      sysio::check(a.symbol == symbol, "attempt to subtract asset with different symbol");
       amount -= a.amount;
-      eosio::check(-max_amount <= amount, "subtraction underflow");
-      eosio::check(amount <= max_amount, "subtraction overflow");
+      sysio::check(-max_amount <= amount, "subtraction underflow");
+      sysio::check(amount <= max_amount, "subtraction overflow");
       return *this;
    }
 
@@ -114,10 +114,10 @@ struct asset {
     * @post The amount of this asset is added with the amount of asset a
     */
    asset& operator+=(const asset& a) {
-      eosio::check(a.symbol == symbol, "attempt to add asset with different symbol");
+      sysio::check(a.symbol == symbol, "attempt to add asset with different symbol");
       amount += a.amount;
-      eosio::check(-max_amount <= amount, "addition underflow");
-      eosio::check(amount <= max_amount, "addition overflow");
+      sysio::check(-max_amount <= amount, "addition underflow");
+      sysio::check(amount <= max_amount, "addition overflow");
       return *this;
    }
 
@@ -159,8 +159,8 @@ struct asset {
 #ifndef ABIEOS_NO_INT128
    asset& operator*=(int64_t a) {
       __int128 tmp = (__int128)amount * (__int128)a;
-      eosio::check(tmp <= max_amount, "multiplication overflow");
-      eosio::check(tmp >= -max_amount, "multiplication underflow");
+      sysio::check(tmp <= max_amount, "multiplication overflow");
+      sysio::check(tmp >= -max_amount, "multiplication underflow");
       amount = (int64_t)tmp;
       return *this;
    }
@@ -207,8 +207,8 @@ struct asset {
     * @post The amount of this asset is divided by a
     */
    asset& operator/=(int64_t a) {
-      eosio::check(a != 0, "divide by zero");
-      eosio::check(!(amount == std::numeric_limits<int64_t>::min() && a == -1), "signed division overflow");
+      sysio::check(a != 0, "divide by zero");
+      sysio::check(!(amount == std::numeric_limits<int64_t>::min() && a == -1), "signed division overflow");
       amount /= a;
       return *this;
    }
@@ -235,8 +235,8 @@ struct asset {
     * @pre Both asset must have the same symbol
     */
    friend int64_t operator/(const asset& a, const asset& b) {
-      eosio::check(b.amount != 0, "divide by zero");
-      eosio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
+      sysio::check(b.amount != 0, "divide by zero");
+      sysio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
       return a.amount / b.amount;
    }
 
@@ -250,7 +250,7 @@ struct asset {
     * @pre Both asset must have the same symbol
     */
    friend bool operator==(const asset& a, const asset& b) {
-      eosio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
+      sysio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
       return a.amount == b.amount;
    }
 
@@ -275,7 +275,7 @@ struct asset {
     * @pre Both asset must have the same symbol
     */
    friend bool operator<(const asset& a, const asset& b) {
-      eosio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
+      sysio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
       return a.amount < b.amount;
    }
 
@@ -289,7 +289,7 @@ struct asset {
     * @pre Both asset must have the same symbol
     */
    friend bool operator<=(const asset& a, const asset& b) {
-      eosio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
+      sysio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
       return a.amount <= b.amount;
    }
 
@@ -303,7 +303,7 @@ struct asset {
     * @pre Both asset must have the same symbol
     */
    friend bool operator>(const asset& a, const asset& b) {
-      eosio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
+      sysio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
       return a.amount > b.amount;
    }
 
@@ -317,7 +317,7 @@ struct asset {
     * @pre Both asset must have the same symbol
     */
    friend bool operator>=(const asset& a, const asset& b) {
-      eosio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
+      sysio::check(a.symbol == b.symbol, "comparison of assets with different symbols is not allowed");
       return a.amount >= b.amount;
    }
 
@@ -331,14 +331,14 @@ struct asset {
    std::string to_string() const { return asset_to_string(amount, symbol.value); }
 };
 
-EOSIO_REFLECT(asset, amount, symbol);
+SYSIO_REFLECT(asset, amount, symbol);
 
 template <typename S>
 inline void from_string(asset& result, S& stream) {
    int64_t  amount;
    uint64_t sym;
-   check(eosio::string_to_asset(amount, sym, stream.pos, stream.end, true),
-      convert_stream_error(eosio::stream_error::invalid_asset_format));
+   check(sysio::string_to_asset(amount, sym, stream.pos, stream.end, true),
+      convert_stream_error(sysio::stream_error::invalid_asset_format));
    result = asset{ amount, symbol{ sym } };
 }
 
@@ -351,7 +351,7 @@ template <typename S>
 void from_json(asset& obj, S& stream) {
    auto s = stream.get_string();
    check(string_to_asset(obj.amount, obj.symbol.value, s.data(), s.data() + s.size()),
-      convert_json_error(eosio::from_json_error::expected_symbol_code));
+      convert_json_error(sysio::from_json_error::expected_symbol_code));
 }
 
 /**
@@ -398,33 +398,33 @@ struct extended_asset {
 
    // Subtraction operator
    friend extended_asset operator-(const extended_asset& a, const extended_asset& b) {
-      eosio::check(a.contract == b.contract, "type mismatch");
+      sysio::check(a.contract == b.contract, "type mismatch");
       return { a.quantity - b.quantity, a.contract };
    }
 
    // Addition operator
    friend extended_asset operator+(const extended_asset& a, const extended_asset& b) {
-      eosio::check(a.contract == b.contract, "type mismatch");
+      sysio::check(a.contract == b.contract, "type mismatch");
       return { a.quantity + b.quantity, a.contract };
    }
 
    /// Addition operator.
    friend extended_asset& operator+=(extended_asset& a, const extended_asset& b) {
-      eosio::check(a.contract == b.contract, "type mismatch");
+      sysio::check(a.contract == b.contract, "type mismatch");
       a.quantity += b.quantity;
       return a;
    }
 
    /// Subtraction operator.
    friend extended_asset& operator-=(extended_asset& a, const extended_asset& b) {
-      eosio::check(a.contract == b.contract, "type mismatch");
+      sysio::check(a.contract == b.contract, "type mismatch");
       a.quantity -= b.quantity;
       return a;
    }
 
    /// Less than operator
    friend bool operator<(const extended_asset& a, const extended_asset& b) {
-      eosio::check(a.contract == b.contract, "type mismatch");
+      sysio::check(a.contract == b.contract, "type mismatch");
       return a.quantity < b.quantity;
    }
 
@@ -440,13 +440,13 @@ struct extended_asset {
 
    /// Comparison operator
    friend bool operator<=(const extended_asset& a, const extended_asset& b) {
-      eosio::check(a.contract == b.contract, "type mismatch");
+      sysio::check(a.contract == b.contract, "type mismatch");
       return a.quantity <= b.quantity;
    }
 
    /// Comparison operator
    friend bool operator>=(const extended_asset& a, const extended_asset& b) {
-      eosio::check(a.contract == b.contract, "type mismatch");
+      sysio::check(a.contract == b.contract, "type mismatch");
       return a.quantity >= b.quantity;
    }
 
@@ -454,5 +454,5 @@ struct extended_asset {
    /// @endcond
 };
 
-EOSIO_REFLECT(extended_asset, quantity, contract);
-} // namespace eosio
+SYSIO_REFLECT(extended_asset, quantity, contract);
+} // namespace sysio

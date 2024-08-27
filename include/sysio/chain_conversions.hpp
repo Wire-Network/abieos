@@ -8,7 +8,7 @@
 #include <vector>
 #include <optional>
 
-namespace eosio {
+namespace sysio {
 
 // TODO remove in c++20
 namespace {
@@ -33,7 +33,7 @@ struct month {
    uint32_t m;
 };
 struct month_day {
-   inline month_day( eosio::month m, eosio::day d ) : m(m), d(d) {}
+   inline month_day( sysio::month m, sysio::day d ) : m(m), d(d) {}
    inline auto month() const { return m; }
    inline auto day() const { return d; }
    struct month m;
@@ -127,7 +127,7 @@ constexpr inline bool is_valid_char(char c) {
 
 template <char C>
 constexpr inline uint64_t char_to_name_digit_strict() {
-   static_assert(is_valid_char(C), "character is not for an eosio name");
+   static_assert(is_valid_char(C), "character is not for an sysio name");
    if constexpr (C >= 'a' && C <= 'z')
       return (C - 'a') + 6;
    else if constexpr (C >= '1' && C <= '5')
@@ -158,7 +158,7 @@ template <std::size_t N, uint64_t ValueSoFar, char C, char... Rest>
 constexpr inline uint64_t string_to_name_strict_impl() {
    if constexpr (N == 12)
       static_assert((char_to_name_digit_strict<C>() & 0xf) == char_to_name_digit_strict<C>(),
-            "eosio name 13th character cannot be a letter after j");
+            "sysio name 13th character cannot be a letter after j");
    if constexpr (sizeof...(Rest) > 0)
       return string_to_name_strict_impl<N+1,
              ValueSoFar | (char_to_name_digit_strict<C>() & 0x1f) << (64 - 5 * (N+1)), Rest...>();
@@ -168,7 +168,7 @@ constexpr inline uint64_t string_to_name_strict_impl() {
 
 template <char... Str>
 constexpr inline uint64_t string_to_name_strict() {
-   static_assert(sizeof...(Str) <= 13, "eosio name string is too long");
+   static_assert(sizeof...(Str) <= 13, "sysio name string is too long");
    if constexpr (sizeof...(Str) == 0)
       return 0;
    else
@@ -360,7 +360,7 @@ inline std::string symbol_code_to_string(uint64_t v) {
 
 [[nodiscard]] inline bool string_to_symbol(uint64_t& result, uint8_t precision, const char*& pos, const char* end,
                                            bool require_end) {
-   if (!eosio::string_to_symbol_code(result, pos, end, require_end))
+   if (!sysio::string_to_symbol_code(result, pos, end, require_end))
       return false;
    result = (result << 8) | precision;
    return true;
@@ -384,7 +384,7 @@ inline std::string symbol_code_to_string(uint64_t v) {
 }
 
 inline std::string symbol_to_string(uint64_t v) {
-   return std::to_string(v & 0xff) + "," + eosio::symbol_code_to_string(v >> 8);
+   return std::to_string(v & 0xff) + "," + sysio::symbol_code_to_string(v >> 8);
 }
 
 [[nodiscard]] inline bool string_to_asset(int64_t& amount, uint64_t& symbol, const char*& s, const char* end,
@@ -412,7 +412,7 @@ inline std::string symbol_to_string(uint64_t v) {
       uamount = -uamount;
    amount = uamount;
    uint64_t code;
-   if (!eosio::string_to_symbol_code(code, s, end, expect_end))
+   if (!sysio::string_to_symbol_code(code, s, end, expect_end))
       return false;
    symbol = (code << 8) | precision;
    return true;
@@ -444,7 +444,7 @@ inline std::string asset_to_string(int64_t amount, uint64_t symbol) {
    if (amount < 0)
       result += '-';
    std::reverse(result.begin(), result.end());
-   return result + ' ' + eosio::symbol_code_to_string(symbol >> 8);
+   return result + ' ' + sysio::symbol_code_to_string(symbol >> 8);
 }
 
-} // namespace eosio
+} // namespace sysio

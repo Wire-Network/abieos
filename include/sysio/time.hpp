@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <string>
 
-namespace eosio {
+namespace sysio {
 /**
  *  @defgroup time
  *  @ingroup core
@@ -44,8 +44,8 @@ class microseconds {
    /// @endcond
 };
 
-EOSIO_REFLECT(microseconds, _count);
-EOSIO_COMPARE(microseconds);
+SYSIO_REFLECT(microseconds, _count);
+SYSIO_COMPARE(microseconds);
 
 inline microseconds seconds(int64_t s) { return microseconds(s * 1000000); }
 inline microseconds milliseconds(int64_t s) { return microseconds(s * 1000); }
@@ -84,22 +84,22 @@ class time_point {
    /// @endcond
 };
 
-EOSIO_REFLECT(time_point, elapsed);
-EOSIO_COMPARE(time_point);
+SYSIO_REFLECT(time_point, elapsed);
+SYSIO_COMPARE(time_point);
 
 template <typename S>
 void from_json(time_point& obj, S& stream) {
    auto s = stream.get_string();
    uint64_t utc_microseconds;
-   if (!eosio::string_to_utc_microseconds(utc_microseconds, s.data(), s.data() + s.size())) {
-      check(false, convert_json_error(eosio::from_json_error::expected_time_point));
+   if (!sysio::string_to_utc_microseconds(utc_microseconds, s.data(), s.data() + s.size())) {
+      check(false, convert_json_error(sysio::from_json_error::expected_time_point));
    }
    obj = time_point(microseconds(utc_microseconds));
 }
 
 template <typename S>
 void to_json(const time_point& obj, S& stream) {
-   return to_json(eosio::microseconds_to_str(obj.elapsed._count), stream);
+   return to_json(sysio::microseconds_to_str(obj.elapsed._count), stream);
 }
 
 /**
@@ -118,11 +118,11 @@ class time_point_sec {
    static time_point_sec maximum() { return time_point_sec(0xffffffff); }
    static time_point_sec min() { return time_point_sec(0); }
 
-            operator time_point() const { return time_point(eosio::seconds(utc_seconds)); }
+            operator time_point() const { return time_point(sysio::seconds(utc_seconds)); }
    uint32_t sec_since_epoch() const { return utc_seconds; }
 
    /// @cond INTERNAL
-   time_point_sec operator=(const eosio::time_point& t) {
+   time_point_sec operator=(const sysio::time_point& t) {
       utc_seconds = uint32_t(t.time_since_epoch().count() / 1000000ll);
       return *this;
    }
@@ -164,21 +164,21 @@ class time_point_sec {
    /// @endcond
 };
 
-EOSIO_REFLECT(time_point_sec, utc_seconds);
-EOSIO_COMPARE(time_point);
+SYSIO_REFLECT(time_point_sec, utc_seconds);
+SYSIO_COMPARE(time_point);
 
 template <typename S>
 void from_json(time_point_sec& obj, S& stream) {
    auto s = stream.get_string();
    const char* p = s.data();
-   if (!eosio::string_to_utc_seconds(obj.utc_seconds, p, s.data() + s.size(), true, true)) {
+   if (!sysio::string_to_utc_seconds(obj.utc_seconds, p, s.data() + s.size(), true, true)) {
       check(false, convert_json_error(from_json_error::expected_time_point));
    }
 }
 
 template <typename S>
 void to_json(const time_point_sec& obj, S& stream) {
-   return to_json(eosio::microseconds_to_str(uint64_t(obj.utc_seconds) * 1'000'000), stream);
+   return to_json(sysio::microseconds_to_str(uint64_t(obj.utc_seconds) * 1'000'000), stream);
 }
 
 /**
@@ -202,7 +202,7 @@ class block_timestamp {
    static block_timestamp min() { return block_timestamp(0); }
 
    block_timestamp next() const {
-      eosio::check(std::numeric_limits<uint32_t>::max() - slot >= 1, "block timestamp overflow");
+      sysio::check(std::numeric_limits<uint32_t>::max() - slot >= 1, "block timestamp overflow");
       auto result = block_timestamp(*this);
       result.slot += 1;
       return result;
@@ -247,7 +247,7 @@ class block_timestamp {
  */
 typedef block_timestamp block_timestamp_type;
 
-EOSIO_REFLECT(block_timestamp_type, slot);
+SYSIO_REFLECT(block_timestamp_type, slot);
 
 template <typename S>
 void from_json(block_timestamp& obj, S& stream) {
@@ -261,4 +261,4 @@ void to_json(const block_timestamp& obj, S& stream) {
    return to_json(time_point(obj), stream);
 }
 
-} // namespace eosio
+} // namespace sysio

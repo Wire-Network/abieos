@@ -10,7 +10,7 @@
 #include <variant>
 #include <vector>
 
-namespace eosio {
+namespace sysio {
 
 template <typename S>
 bool to_bin(std::string_view sv, S& stream, std::string_view&);
@@ -186,4 +186,4 @@ std::vector<char> convert_to_bin(const T& t) {
    return result;
 }
 
-} // namespace eosio
+} // namespace sysio

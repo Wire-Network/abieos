@@ -9,7 +9,7 @@
 #include "to_json.hpp"
 #include <type_traits>
 
-namespace eosio {
+namespace sysio {
 
 /**
  *  @defgroup fixed_bytes Fixed Size Byte Array
@@ -195,24 +195,24 @@ class fixed_bytes {
    std::array<Word, count_words<Word>()> value{0};
 };
 
-// This is only needed to make eosio.cdt/tests/unit/fixed_bytes_tests.cpp pass.
+// This is only needed to make sysio.cdt/tests/unit/fixed_bytes_tests.cpp pass.
 // Everything else should be using one of the typedefs below.
 template <std::size_t Size, typename Word, typename F>
-void eosio_for_each_field(fixed_bytes<Size, Word>*, F&& f) {
+void sysio_for_each_field(fixed_bytes<Size, Word>*, F&& f) {
    f("value",
      [](auto* p) -> decltype(&std::decay_t<decltype(*p)>::value) { return &std::decay_t<decltype(*p)>::value; });
 }
 
 template <std::size_t Size, typename Word>
-EOSIO_COMPARE(fixed_bytes<Size, Word>);
+SYSIO_COMPARE(fixed_bytes<Size, Word>);
 
 using checksum160 = fixed_bytes<20,uint32_t>;
 using checksum256 = fixed_bytes<32>;
 using checksum512 = fixed_bytes<64>;
 
-EOSIO_REFLECT(checksum160, value);
-EOSIO_REFLECT(checksum256, value);
-EOSIO_REFLECT(checksum512, value);
+SYSIO_REFLECT(checksum160, value);
+SYSIO_REFLECT(checksum256, value);
+SYSIO_REFLECT(checksum512, value);
 
 template <typename T, std::size_t Size, typename S>
 void from_bin(fixed_bytes<Size, T>& obj, S& stream) {
@@ -234,8 +234,8 @@ void to_key(const fixed_bytes<Size, T>& obj, S& stream) {
 template <typename T, std::size_t Size, typename S>
 void from_json(fixed_bytes<Size, T>& obj, S& stream) {
    std::vector<char> v;
-   eosio::from_json_hex(v, stream);
-   check(v.size() == Size, convert_json_error(eosio::from_json_error::hex_string_incorrect_length));
+   sysio::from_json_hex(v, stream);
+   check(v.size() == Size, convert_json_error(sysio::from_json_error::hex_string_incorrect_length));
    std::array<uint8_t, Size> bytes;
    std::memcpy(bytes.data(), v.data(), Size);
    obj = fixed_bytes<Size, T>(bytes);
@@ -244,7 +244,7 @@ void from_json(fixed_bytes<Size, T>& obj, S& stream) {
 template <typename T, std::size_t Size, typename S>
 void to_json(const fixed_bytes<Size, T>& obj, S& stream) {
    auto bytes = obj.extract_as_byte_array();
-   eosio::to_json_hex((const char*)bytes.data(), bytes.size(), stream);
+   sysio::to_json_hex((const char*)bytes.data(), bytes.size(), stream);
 }
 
-} // namespace eosio
+} // namespace sysio
