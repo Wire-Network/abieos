@@ -1,4 +1,4 @@
-// copyright defined in abieos/LICENSE.txt
+// copyright defined in abieos/LICENSE.md
 
 const path = require('path');
 const nodeExternals = require('webpack-node-externals');

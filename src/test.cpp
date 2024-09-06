@@ -1,4 +1,4 @@
-// copyright defined in abieos/LICENSE.txt
+// copyright defined in abieos/LICENSE.md
 
 #include "abieos.h"
 #include "abieos.hpp"

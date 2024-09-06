@@ -1,4 +1,4 @@
-// copyright defined in abieos/LICENSE.txt
+// copyright defined in abieos/LICENSE.md
 
 #include "fuzzer.hpp"
 #include <stdio.h>

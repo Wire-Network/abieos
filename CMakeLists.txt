@@ -1,4 +1,4 @@
-# copyright defined in abieos/LICENSE.txt
+# copyright defined in abieos/LICENSE.md
 
 cmake_minimum_required (VERSION 3.8)
 project(abieos VERSION 0.1 LANGUAGES CXX C)

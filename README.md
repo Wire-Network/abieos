@@ -42,7 +42,7 @@ Example transaction data for `abieos_json_to_bin`:
     "delay_sec": 0,
     "context_free_actions": [],
     "actions": [{
-        "account": "eosio.token",
+        "account": "sysio.token",
         "name": "transfer",
         "authorization":[{
             "actor":"useraaaaaaaa",
