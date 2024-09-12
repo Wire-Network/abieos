@@ -1,6 +1,6 @@
 [submodule "external/rapidjson"]
 	path = external/rapidjson
 	url = ../rapidjson.git
-[submodule "external/eosjs"]
-	path = external/eosjs
-	url = ../wirejs-native
+[submodule "external/wirejs"]
+	path = external/wirejs
+	url = ../wirejs-native.git

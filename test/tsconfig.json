@@ -8,7 +8,7 @@
     },
     "include": [
         "src/*.ts",
-        "../external/eosjs2/src/eosjs2-numeric.ts",
-        "../external/eosjs2/src/eosjs2-serialize.ts"
+        "../external/wirejs/src/wirejs-numeric.ts",
+        "../external/wirejs/src/wirejs-serialize.ts"
     ]
 }
