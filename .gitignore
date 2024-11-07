@@ -2,3 +2,4 @@
 .DS_Store
 build
 build2
+cmake-build-debug

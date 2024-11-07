@@ -15,22 +15,22 @@ extern const char* const state_history_plugin_abi;
 
 inline const bool generate_corpus = false;
 
-const char tokenHexAbi[] = "0e656f73696f3a3a6162692f312e30010c6163636f756e745f6e616d65046e61"
-                           "6d6505087472616e7366657200040466726f6d0c6163636f756e745f6e616d65"
-                           "02746f0c6163636f756e745f6e616d65087175616e7469747905617373657404"
-                           "6d656d6f06737472696e67066372656174650002066973737565720c6163636f"
-                           "756e745f6e616d650e6d6178696d756d5f737570706c79056173736574056973"
-                           "737565000302746f0c6163636f756e745f6e616d65087175616e746974790561"
-                           "73736574046d656d6f06737472696e67076163636f756e7400010762616c616e"
-                           "63650561737365740e63757272656e63795f7374617473000306737570706c79"
-                           "0561737365740a6d61785f737570706c79056173736574066973737565720c61"
-                           "63636f756e745f6e616d6503000000572d3ccdcd087472616e73666572000000"
-                           "000000a531760569737375650000000000a86cd4450663726561746500020000"
-                           "00384f4d113203693634010863757272656e6379010675696e74363407616363"
-                           "6f756e740000000000904dc603693634010863757272656e6379010675696e74"
-                           "36340e63757272656e63795f7374617473000000";
+const char tokenHexAbi[] = "0E737973696F3A3A6162692F312E30010C6163636F756E745F6E616D65046E61"
+                           "6D6505087472616E7366657200040466726F6D0C6163636F756E745F6E616D65"
+                           "02746F0C6163636F756E745F6E616D65087175616E7469747905617373657404"
+                           "6D656D6F06737472696E67066372656174650002066973737565720C6163636F"
+                           "756E745F6E616D650E6D6178696D756D5F737570706C79056173736574056973"
+                           "737565000302746F0C6163636F756E745F6E616D65087175616E746974790561"
+                           "73736574046D656D6F06737472696E67076163636F756E7400010762616C616E"
+                           "63650561737365740E63757272656E63795F7374617473000306737570706C79"
+                           "0561737365740A6D61785F737570706C79056173736574066973737565720C61"
+                           "63636F756E745F6E616D6503000000572D3CCDCD087472616E73666572000000"
+                           "000000A531760569737375650000000000A86CD4450663726561746500020000"
+                           "00384F4D113203693634010863757272656E6379010675696E74363407616363"
+                           "6F756E740000000000904DC603693634010863757272656E6379010675696E74"
+                           "36340E63757272656E63795F7374617473000000";
 
-const char testHexAbi[] = "0E656F73696F3A3A6162692F312E310004027331000102783104696E74380273"
+const char testHexAbi[] = "0E737973696F3A3A6162692F312E310004027331000102783104696E74380273"
                           "32000202793105696E74382402793205696E7438240273330003027A3105696E"
                           "743824027A3203763124027A3303733224027334000202613106696E74383F24"
                           "02623107696E74385B5D240000000000010276310304696E7438027331027332";
@@ -870,29 +870,29 @@ void check_types() {
                 [&] { return abieos_json_to_bin(context, 0, "checksum256", R"(true)"); });
     check_error(context, "hex string has incorrect length",
                 [&] { return abieos_json_to_bin(context, 0, "checksum256", R"("a0")"); });
-    check_type(context, 0, "public_key", R"("EOS1111111111111111111111111111111114T1Anm")",
+    check_type(context, 0, "public_key", R"("SYS1111111111111111111111111111111114T1Anm")",
                R"("PUB_K1_11111111111111111111111111111111149Mr2R")");
-    check_type(context, 0, "public_key", R"("EOS11111111111111111111111115qCHTcgbQwptSz99m")",
+    check_type(context, 0, "public_key", R"("SYS11111111111111111111111115qCHTcgbQwptSz99m")",
                R"("PUB_K1_11111111111111111111111115qCHTcgbQwpvP72Uq")");
-    check_type(context, 0, "public_key", R"("EOS111111111111111114ZrjxJnU1LA5xSyrWMNuXTrYSJ57")",
+    check_type(context, 0, "public_key", R"("SYS111111111111111114ZrjxJnU1LA5xSyrWMNuXTrYSJ57")",
                R"("PUB_K1_111111111111111114ZrjxJnU1LA5xSyrWMNuXTrVub2r")");
-    check_type(context, 0, "public_key", R"("EOS1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF23dosU")",
+    check_type(context, 0, "public_key", R"("SYS1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF23dosU")",
                R"("PUB_K1_1111111113diW7pnisfdBvHTXP7wvW5k5Ky1e5DVuF4PizpM")");
-    check_type(context, 0, "public_key", R"("EOS11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgmjgbT")",
+    check_type(context, 0, "public_key", R"("SYS11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgmjgbT")",
                R"("PUB_K1_11DsZ6Lyr1aXpm9aBqqgV4iFJpNbSw5eE9LLTwNAxqjJgXSdB8")");
-    check_type(context, 0, "public_key", R"("EOS12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVYNMRa2")",
+    check_type(context, 0, "public_key", R"("SYS12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVYNMRa2")",
                R"("PUB_K1_12wkBET2rRgE8pahuaczxKbmv7ciehqsne57F9gtzf1PVb7Rf7o")");
-    check_type(context, 0, "public_key", R"("EOS1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9SaXz9a")",
+    check_type(context, 0, "public_key", R"("SYS1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9SaXz9a")",
                R"("PUB_K1_1yp8ebBuKZ13orqUrZsGsP49e6K3ThVK1nLutxSyU5j9Tx1r96")");
-    check_type(context, 0, "public_key", R"("EOS9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHL7mue4K")",
+    check_type(context, 0, "public_key", R"("SYS9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHL7mue4K")",
                R"("PUB_K1_9adaAMuB9v8yX1mZ5PtoB6VFSCeqRGjASd8ZTM6VUkiHLB5XEdw")");
-    check_type(context, 0, "public_key", R"("EOS69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmTBWz4D")",
+    check_type(context, 0, "public_key", R"("SYS69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmTBWz4D")",
                R"("PUB_K1_69X3383RzBZj41k73CSjUNXM5MYGpnDxyPnWUKPEtYQmVzqTY7")");
-    check_type(context, 0, "public_key", R"("EOS7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEgz3w8S")",
+    check_type(context, 0, "public_key", R"("SYS7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEgz3w8S")",
                R"("PUB_K1_7yBtksm8Kkg85r4in4uCbfN77uRwe82apM8jjbhFVDgEcarGb8")");
-    check_type(context, 0, "public_key", R"("EOS7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixuQUtdA")",
+    check_type(context, 0, "public_key", R"("SYS7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixuQUtdA")",
                R"("PUB_K1_7WnhaKwHpbSidYuh2DF1qAExTRUtPEdZCaZqt75cKcixtU7gEn")");
-    check_type(context, 0, "public_key", R"("EOS7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6xJwxNV")",
+    check_type(context, 0, "public_key", R"("SYS7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6xJwxNV")",
                R"("PUB_K1_7Bn1YDeZ18w2N9DU4KAJxZDt6hk3L7eUwFRAc1hb5bp6uEBZA8")");
     check_type(context, 0, "public_key", R"("PUB_K1_11111111111111111111111111111111149Mr2R")");
     check_type(context, 0, "public_key", R"("PUB_K1_11111111111111111111111115qCHTcgbQwpvP72Uq")");
