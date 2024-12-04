@@ -458,7 +458,7 @@ using extensions_type = std::vector<std::pair<uint16_t, bytes>>;
 using sysio::abi_def;
 
 ABIEOS_NODISCARD inline bool check_abi_version(const std::string& s, std::string& error) {
-    if (s.substr(0, 13) != "sysio::abi/1.")
+    if (s.substr(0, 13) != "sysio::abi/1." && s.substr(0, 13) != "eosio::abi/1.")
         return set_error(error, "unsupported abi version");
     return true;
 }
