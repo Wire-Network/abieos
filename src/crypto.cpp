@@ -19,7 +19,8 @@ enum key_type : uint8_t {
     k1 = 0,
     r1 = 1,
     wa = 2,
-    em = 3 // New: Ethereum Message key type
+    em = 3, // New: Ethereum Message key type
+    ed = 4  // New: Ed25519 key type
 };
 
 constexpr char base58_chars[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -128,6 +129,8 @@ std::string sysio::public_key_to_string(const public_key& key) {
         return key_to_string(key, "WA", "PUB_WA_");
     } else if (key.index() == key_type::em) {
         return key_to_string(key, "EM", "PUB_EM_");
+    } else if (key.index() == key_type::ed) {
+        return key_to_string(key, "ED", "PUB_ED_");
     } else {
        check(false, convert_json_error(sysio::from_json_error::expected_public_key));
        __builtin_unreachable();
@@ -146,6 +149,8 @@ public_key sysio::public_key_from_string(std::string_view s) {
         return string_to_key<public_key>(s.substr(7), key_type::wa, "WA");
     } else if (s.substr(0, 7) == "PUB_EM_") {
         return string_to_key<public_key>(s.substr(7), key_type::em, "EM");
+    } else if (s.substr(0, 7) == "PUB_ED_") {
+        return string_to_key<public_key>(s.substr(7), key_type::ed, "ED");
     } else {
        check(false, convert_json_error(from_json_error::expected_public_key));
        __builtin_unreachable();
@@ -194,6 +199,8 @@ std::string sysio::signature_to_string(const sysio::signature& signature) {
         return key_to_string(signature, "WA", "SIG_WA_");
     else if (signature.index() == key_type::em)
         return key_to_string(signature, "EM", "SIG_EM_");
+    else if (signature.index() == key_type::ed)
+        return key_to_string(signature, "ED", "SIG_ED_");
     else {
        check(false, convert_json_error(sysio::from_json_error::expected_signature));
        __builtin_unreachable();
@@ -209,6 +216,8 @@ signature sysio::signature_from_string(std::string_view s) {
         return string_to_key<signature>(s.substr(7), key_type::wa, "WA");
     else if (s.size() >= 7 && s.substr(0, 7) == "SIG_EM_")
         return string_to_key<signature>(s.substr(7), key_type::em, "EM");
+    else if (s.size() >= 7 && s.substr(0, 7) == "SIG_ED_")
+        return string_to_key<signature>(s.substr(7), key_type::ed, "ED");
     else {
        check(false, convert_json_error(sysio::from_json_error::expected_signature));
        __builtin_unreachable();
