@@ -20,11 +20,20 @@ namespace sysio {
 /**
  *  SYSIO ECC public key data
  *
- *  Fixed size representation of either a K1 or R1 compressed public key
+ *  Fixed size representation of a K1, R1, or EM compressed public key
 
  *  @ingroup public_key
  */
 using ecc_public_key = std::array<char, 33>;
+
+/**
+ *  SYSIO ECC public key data
+ *
+ *  Fixed size representation of an ED25519 public key
+
+ *  @ingroup public_key
+ */
+using ed_public_key = std::array<char, 33>;
 
 /**
  *  SYSIO WebAuthN public key
@@ -65,22 +74,33 @@ SYSIO_COMPARE(webauthn_public_key);
  *   0 : a ECC K1 public key
  *   1 : a ECC R1 public key
  *   2 : a WebAuthN public key (requires the host chain to activate the WEBAUTHN_KEY consensus upgrade)
+ *   3 : a ECC EM public key
+ *   4 : an ED25519 public key
  *
  *  @ingroup public_key
  */
-using public_key = std::variant<ecc_public_key, ecc_public_key, webauthn_public_key>;
+using public_key = std::variant<ecc_public_key, ecc_public_key, webauthn_public_key, ecc_public_key, ed_public_key>;
 
 using ecc_private_key = std::array<char, 32>;
-using private_key     = std::variant<ecc_private_key, ecc_private_key>;
+using private_key     = std::variant<ecc_private_key, ecc_private_key, ecc_private_key>;
 
 /**
  *  SYSIO ECC signature data
  *
- *  Fixed size representation of either a K1 or R1 ECC compact signature
+ *  Fixed size representation of a K1, R1, or EM ECC compact signature
 
  *  @ingroup signature
  */
 using ecc_signature = std::array<char, 65>;
+
+/**
+ *  SYSIO ECC signature data
+ *
+ *  Fixed size representation of an ED25519 signature
+
+ *  @ingroup signature
+ */
+using ed_signature = std::array<char, 65>;
 
 struct webauthn_signature {
    /**
@@ -104,7 +124,7 @@ struct webauthn_signature {
 SYSIO_REFLECT(webauthn_signature, compact_signature, auth_data, client_json);
 SYSIO_COMPARE(webauthn_signature);
 
-using signature = std::variant<ecc_signature, ecc_signature, webauthn_signature>;
+using signature = std::variant<ecc_signature, ecc_signature, webauthn_signature, ecc_signature, ed_signature>;
 constexpr const char* get_type_name(public_key*) { return "public_key"; }
 constexpr const char* get_type_name(private_key*) { return "private_key"; }
 constexpr const char* get_type_name(signature*) { return "signature"; }

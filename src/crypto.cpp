@@ -19,6 +19,8 @@ enum key_type : uint8_t {
     k1 = 0,
     r1 = 1,
     wa = 2,
+    em = 3, // New: Ethereum Message key type
+    ed = 4  // New: Ed25519 key type
 };
 
 constexpr char base58_chars[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -125,6 +127,10 @@ std::string sysio::public_key_to_string(const public_key& key) {
         return key_to_string(key, "R1", "PUB_R1_");
     } else if (key.index() == key_type::wa) {
         return key_to_string(key, "WA", "PUB_WA_");
+    } else if (key.index() == key_type::em) {
+        return key_to_string(key, "EM", "PUB_EM_");
+    } else if (key.index() == key_type::ed) {
+        return key_to_string(key, "ED", "PUB_ED_");
     } else {
        check(false, convert_json_error(sysio::from_json_error::expected_public_key));
        __builtin_unreachable();
@@ -141,6 +147,10 @@ public_key sysio::public_key_from_string(std::string_view s) {
         return string_to_key<public_key>(s.substr(7), key_type::r1, "R1");
     } else if (s.substr(0, 7) == "PUB_WA_") {
         return string_to_key<public_key>(s.substr(7), key_type::wa, "WA");
+    } else if (s.substr(0, 7) == "PUB_EM_") {
+        return string_to_key<public_key>(s.substr(7), key_type::em, "EM");
+    } else if (s.substr(0, 7) == "PUB_ED_") {
+        return string_to_key<public_key>(s.substr(7), key_type::ed, "ED");
     } else {
        check(false, convert_json_error(from_json_error::expected_public_key));
        __builtin_unreachable();
@@ -152,6 +162,8 @@ std::string sysio::private_key_to_string(const private_key& private_key) {
         return key_to_string(private_key, "K1", "PVT_K1_");
     else if (private_key.index() == key_type::r1)
         return key_to_string(private_key, "R1", "PVT_R1_");
+    // else if (private_key.index() == key_type::em)
+    //     return key_to_string(private_key, "EM", "PVT_EM_");
     else {
        check(false, convert_json_error(from_json_error::expected_private_key));
        __builtin_unreachable();
@@ -163,6 +175,8 @@ private_key sysio::private_key_from_string(std::string_view s) {
         return string_to_key<private_key>(s.substr(7), key_type::k1, "K1");
     else if (s.substr(0, 7) == "PVT_R1_")
         return string_to_key<private_key>(s.substr(7), key_type::r1, "R1");
+    // else if (s.substr(0, 7) == "PVT_EM_")
+    //     return string_to_key<private_key>(s.substr(7), key_type::em, "EM");
     else if (s.substr(0, 4) == "PVT_") {
        check(false, convert_json_error(from_json_error::expected_private_key));
        __builtin_unreachable();
@@ -183,6 +197,10 @@ std::string sysio::signature_to_string(const sysio::signature& signature) {
         return key_to_string(signature, "R1", "SIG_R1_");
     else if (signature.index() == key_type::wa)
         return key_to_string(signature, "WA", "SIG_WA_");
+    else if (signature.index() == key_type::em)
+        return key_to_string(signature, "EM", "SIG_EM_");
+    else if (signature.index() == key_type::ed)
+        return key_to_string(signature, "ED", "SIG_ED_");
     else {
        check(false, convert_json_error(sysio::from_json_error::expected_signature));
        __builtin_unreachable();
@@ -196,6 +214,10 @@ signature sysio::signature_from_string(std::string_view s) {
         return string_to_key<signature>(s.substr(7), key_type::r1, "R1");
     else if (s.size() >= 7 && s.substr(0, 7) == "SIG_WA_")
         return string_to_key<signature>(s.substr(7), key_type::wa, "WA");
+    else if (s.size() >= 7 && s.substr(0, 7) == "SIG_EM_")
+        return string_to_key<signature>(s.substr(7), key_type::em, "EM");
+    else if (s.size() >= 7 && s.substr(0, 7) == "SIG_ED_")
+        return string_to_key<signature>(s.substr(7), key_type::ed, "ED");
     else {
        check(false, convert_json_error(sysio::from_json_error::expected_signature));
        __builtin_unreachable();
