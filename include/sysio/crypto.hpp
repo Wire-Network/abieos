@@ -27,7 +27,7 @@ namespace sysio {
 using ecc_public_key = std::array<char, 33>;
 
 /**
- *  SYSIO ECC public key data
+ *  SYSIO ED25519 public key data
  *
  *  Fixed size representation of an ED25519 public key
 
@@ -94,7 +94,7 @@ using private_key     = std::variant<ecc_private_key, ecc_private_key, ecc_priva
 using ecc_signature = std::array<char, 65>;
 
 /**
- *  SYSIO ECC signature data
+ *  SYSIO ED25519 signature data
  *
  *  Fixed size representation of an ED25519 signature
 

@@ -1,4 +1,4 @@
-## abieos
+# abieos
 
 Binary <> JSON conversion using ABIs. Compatible with languages which can interface to C; see [src/abieos.h](src/abieos.h).
 
@@ -20,7 +20,7 @@ abieos expects object attributes to be in order. It will complain about missing 
 
 Example action data for `abieos_json_to_bin`:
 
-```
+```sh
 {
     "from": "useraaaaaaaa",
     "to": "useraaaaaaab",
@@ -31,7 +31,7 @@ Example action data for `abieos_json_to_bin`:
 
 Example transaction data for `abieos_json_to_bin`:
 
-```
+```sh
 {
     "expiration": "2018-06-27T20:33:54.000",
     "ref_block_num": 45323,
@@ -61,7 +61,7 @@ Example transaction data for `abieos_json_to_bin`:
 * `sudo apt install libboost-dev libboost-date-time-dev`
 * remove this from CMakeLists.txt (2 places): `-fsanitize=address,undefined`
 
-```
+```sh
 mkdir build
 cd build
 cmake ..
