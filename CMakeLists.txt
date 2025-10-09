@@ -1,6 +1,6 @@
 # copyright defined in abieos/LICENSE.md
 
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.16...4.0)
 project(abieos VERSION 0.1 LANGUAGES CXX C)
 
 set(default_build_type "Release")
@@ -35,8 +35,8 @@ endif()
 find_package(Threads)
 include(GNUInstallDirs)
 
-add_library(abieos STATIC src/abi.cpp src/crypto.cpp include/sysio/fpconv.c)
-target_include_directories(abieos PUBLIC 
+add_library(abieos STATIC src/abi.cpp src/crypto.cpp)
+target_include_directories(abieos PUBLIC
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include" 
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include"
                           "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
@@ -45,8 +45,8 @@ if(ABIEOS_NO_INT128)
 target_compile_definitions(abieos PUBLIC ABIEOS_NO_INT128)
 endif()
 
-add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp include/sysio/fpconv.c)
-target_include_directories(abieos_module PUBLIC 
+add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp)
+target_include_directories(abieos_module PUBLIC
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include" 
                           "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
@@ -75,7 +75,7 @@ target_include_directories(test_abieos_reflect PRIVATE include)
 add_test(NAME test_abieos_reflect COMMAND test_abieos_reflect)
 
 # Causes build issues on some platforms
-# add_executable(test_abieos_sanitize src/test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp include/sysio/fpconv.c)
+# add_executable(test_abieos_sanitize src/test.cpp src/abieos.cpp src/abi.cpp src/crypto.cpp)
 # target_include_directories(test_abieos_sanitize PRIVATE include external/outcome/single-header external/rapidjson/include external/date/include)
 # target_link_libraries(test_abieos_sanitize abieos -fno-omit-frame-pointer -fsanitize=address,undefined ${CMAKE_THREAD_LIBS_INIT})
 # target_compile_options(test_abieos_sanitize PUBLIC -fno-omit-frame-pointer -fsanitize=address,undefined)

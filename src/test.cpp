@@ -123,12 +123,39 @@ const char testAbi[] = R"({
                     "type": "int8"
                 }
             ]
+        },
+        {
+            "name": "s7",
+            "fields": [
+                {
+                    "name": "bs",
+                    "type": "bitset"
+                }
+            ]
+        },
+        {
+            "name": "s8",
+            "fields": [
+                {
+                    "name": "a1",
+                    "type": "int8[2]"
+                }
+            ]
+        },
+        {
+            "name": "s9",
+            "fields": [
+                {
+                    "name": "a1",
+                    "type": "s1[2]"
+                }
+            ]
         }
     ],
     "variants": [
         {
             "name": "v1",
-            "types": ["int8","s1","s2"]
+            "types": ["int8","s1","s2","s7"]
         }
     ]
 })";
@@ -555,12 +582,12 @@ void run_check_type(abieos_context* context, uint64_t contract, const char* type
 }
 
 template <typename F>
-void check_except(const std::string& s, F f) {
+void check_except(const std::string& s, F f, bool check_message) {
     bool ok = false;
     try {
         f();
     } catch (std::exception& e) {
-        if (e.what() == s || true) // !!! Don't check the message right now.  It's in flux.
+        if (e.what() == s || !check_message) // !!! Don't check the message right now.  It's in flux.
             ok = true;
         else
             throw std::runtime_error("expected exception: " + s + " got: " + e.what());
@@ -570,8 +597,8 @@ void check_except(const std::string& s, F f) {
 }
 
 template <typename F>
-void check_error(abieos_context* context, const std::string& s, F f) {
-    check_except(s, [&] { check_context(context, f()); });
+void check_error(abieos_context* context, const std::string& s, F f, bool check_message=false) {
+   check_except(s, [&] { check_context(context, f()); }, check_message);
 }
 
 void check_types() {
@@ -694,6 +721,9 @@ void check_types() {
     check_type(context, 0, "uint8[]", R"([10])");
     check_type(context, 0, "uint8[]", R"([10,9])");
     check_type(context, 0, "uint8[]", R"([10,9,8])");
+    check_type(context, 0, "uint8[1]", R"([10])");
+    check_type(context, 0, "uint8[2]", R"([10,9])");
+    check_type(context, 0, "uint8[3]", R"([10,9,8])");
     check_type(context, 0, "int16", R"(0)");
     check_type(context, 0, "int16", R"(32767)");
     check_type(context, 0, "int16", R"(-32768)");
@@ -795,8 +825,8 @@ void check_types() {
     check_type(context, 0, "float64", R"(0.0)", "0");
     check_type(context, 0, "float64", R"(0.125)");
     check_type(context, 0, "float64", R"(-0.125)");
-    check_type(context, 0, "float64", R"(151115727451828646838272.0)", "151115727451828650000000");
-    check_type(context, 0, "float64", R"(-151115727451828646838272.0)", "-151115727451828650000000");
+    check_type(context, 0, "float64", R"(151115727451828646838272.0)", "151115727451828646838272");
+    check_type(context, 0, "float64", R"(-151115727451828646838272.0)", "-151115727451828646838272");
     check_type(context, 0, "float128", R"("00000000000000000000000000000000")");
     check_type(context, 0, "float128", R"("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")");
     check_type(context, 0, "float128", R"("12345678ABCDEF12345678ABCDEF1234")");
@@ -963,6 +993,8 @@ void check_types() {
     check_type(context, 0, "asset[]", R"([])");
     check_type(context, 0, "asset[]", R"(["0 FOO"])");
     check_type(context, 0, "asset[]", R"(["0 FOO","0.000 FOO"])");
+    check_type(context, 0, "asset[1]", R"(["0 FOO"])");
+    check_type(context, 0, "asset[2]", R"(["0 FOO","0.000 FOO"])");
     check_type(context, 0, "asset?", R"(null)");
     check_type(context, 0, "asset?", R"("0.123456 SIX")");
     check_type(context, 0, "extended_asset", R"({"quantity":"0 FOO","contract":"bar"})");
@@ -1003,10 +1035,32 @@ void check_types() {
                 [&] { return abieos_json_to_bin(context, 0, "int8?[]", ""); });
     check_error(context, "optional (?) and array ([]) don't support nesting",
                 [&] { return abieos_json_to_bin(context, 0, "int8[]?", ""); });
+
+    check_error(context, "optional (?) and fixed_array ([]) don't support nesting",
+                [&] { return abieos_json_to_bin(context, 0, "int8?[1]", "1"); });
+    check_error(context, "optional (?) and fixed_array ([]) don't support nesting",
+                [&] { return abieos_json_to_bin(context, 0, "int8[1]?", "1"); });
+
     check_error(context, "optional (?) may not contain binary extensions ($)",
                 [&] { return abieos_json_to_bin(context, 0, "int8$?", ""); });
     check_error(context, "array ([]) may not contain binary extensions ($)",
                 [&] { return abieos_json_to_bin(context, 0, "int8$[]", ""); });
+    check_error(context, "array ([]) may not contain binary extensions ($)",
+                [&] { return abieos_json_to_bin(context, 0, "int8$[11]", ""); });
+
+    check_error(context, "']' character found without matching '[' in type specification",
+                [&] { return abieos_json_to_bin(context, 0, "int80]", ""); }, true);
+    check_error(context, "Zero size fixed arrays not allowed",
+                [&] { return abieos_json_to_bin(context, 0, "int8[0]", ""); }, true);
+    check_error(context, "Negative size fixed arrays not allowed",
+                [&] { return abieos_json_to_bin(context, 0, "int8[-1]", ""); }, true);
+    check_error(context, "Unexpected size specification for fixed array type",
+                [&] { return abieos_json_to_bin(context, 0, "int8[0x5]", ""); }, true);
+    check_error(context, "Unexpected size specification for fixed array type",
+                [&] { return abieos_json_to_bin(context, 0, "int8[+5]", ""); }, true);
+    check_error(context, "Leading zeros not allowed for fixed array lengrh specification",
+                [&] { return abieos_json_to_bin(context, 0, "int8[010]", ""); }, true);
+
     check_error(context, "binary extensions ($) may not contain binary extensions ($)",
                 [&] { return abieos_json_to_bin(context, 0, "int8$$", ""); });
     check_error(context, "unknown type \"fee\"", [&] { return abieos_json_to_bin(context, 0, "fee", ""); });
@@ -1191,6 +1245,20 @@ void check_types() {
             R"({"x1":9,"x2":10,"x3":{"c1":4,"c2":[{"x1":7,"x2":true,"x3":{"c1":0,"c2":[],"c3":7}},{"x1":null} ]}} )");
     });
 
+    check_error(context, "expected object", [&] { return abieos_json_to_bin(context, testAbiName, "s8", "null"); });
+    check_error(context, "expected object", [&] { return abieos_json_to_bin(context, testAbiName, "s8", "[]"); });
+    check_error(context, "incorrect size for fixed array",
+                [&] { return abieos_json_to_bin(context, testAbiName, "s8", R"({"a1":[]})"); }, true);
+    check_error(context, "incorrect size for fixed array",
+                [&] { return abieos_json_to_bin(context, testAbiName, "s8", R"({"a1":[1]})"); }, true);
+    check_error(context, "Expected [",
+                [&] { return abieos_json_to_bin(context, testAbiName, "s8", R"({"a1":2})"); }, true);
+    check_error(context, "Expected [",
+                [&] { return abieos_json_to_bin(context, testAbiName, "s8", R"({"a1":true})"); }, true);
+    check_type(context, testAbiName, "s8", R"({"a1":[1,27]})");
+    check_type(context, testAbiName, "s9", R"({"a1":[{"x1":6},{"x1":16}]})");
+
+
     auto testWith = [&](auto& abiName) {
         check_type(context, abiName, "v1", R"(["int8",7])");
         check_type(context, abiName, "v1", R"(["s1",{"x1":6}])");
@@ -1225,6 +1293,33 @@ void check_types() {
     check_checksum_capacity(sysio::checksum160({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 20, "checksum160");
     check_checksum_capacity(sysio::checksum256({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 32, "checksum256");
     check_checksum_capacity(sysio::checksum512({1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}), 64, "checksum512");
+
+    // check array of strings
+    check_type(context, 0, "string[]", R"(["hello","world"])");
+
+    // check string[][]
+    check_type(context, 0, "string[][]", R"([["A"],["B"],["C","D"]])");
+
+    // check uint8[][]
+    check_type(context, 0, "uint8[][]", R"([[1]])");
+
+    // check uint8[][][]
+    check_type(context, 0, "uint8[][][]", R"([[[1,2,3],[4,5,6]],[[7,8,9],[]]])");
+
+    // `bitset` checks
+    // ---------------
+    check_type(context, 0, "bitset", R"("")");
+    check_type(context, 0, "bitset", R"("0")");
+    check_type(context, 0, "bitset", R"("11")");
+    check_type(context, 0, "bitset", R"("011")");
+    check_type(context, 0, "bitset", R"("110001011")");
+    check_type(context, 0, "bitset", R"("1100010110110")");
+    check_type(context, 0, "bitset", R"("11000101101100011010101110")");
+    check_type(context, 0, "bitset", R"("11000101101100011010101110100110")");
+    check_type(context, 0, "bitset", R"("110001011011000110101011101001100110")");
+    check_type(context, 0, "bitset", R"("110001011011000110101011101001100110000110")");
+    check_type(context, 0, "bitset", R"("110001011011000110101011101001100110000110000000000000000001")");
+    check_type(context, 0, "bitset", R"("110001011011000110101011101001100110000111111111111111111110")");
 
     abieos_destroy(context);
 }

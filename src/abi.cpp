@@ -1,3 +1,4 @@
+#include <charconv>
 #include <sysio/abi.hpp>
 #include "abieos.hpp"
 
@@ -43,28 +44,57 @@ constexpr void for_each_abi_type(F f) {
     std::apply([&f](auto&& ...t) { (f(&t), ...); }, basic_abi_types{});
 }
 
-abi_type* get_type(std::map<std::string, abi_type>& abi_types,
-                           const std::string& name, int depth) {
-   sysio::check(depth < 32,
-        sysio::convert_abi_error(abi_error::recursion_limit_reached));
+abi_type* get_type(std::map<std::string, abi_type>& abi_types, const std::string& name, int depth) {
+    sysio::check(depth < 32, sysio::convert_abi_error(abi_error::recursion_limit_reached));
     auto it = abi_types.find(name);
     if (it == abi_types.end()) {
         if (ends_with(name, "?")) {
             auto base = get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
-            sysio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::extension>(base->_data),
-                  sysio::convert_abi_error(abi_error::invalid_nesting));
+            // removed abi_type::array from invalid types for nesting, optional array should work
+            sysio::check(
+                !holds_any_alternative<abi_type::optional, abi_type::extension>(base->_data),
+                "Invalid optional nesting for type: " + name
+            );
             auto [iter, success] = abi_types.try_emplace(name, name, abi_type::optional{base}, &abi_serializer_for< ::abieos::pseudo_optional>);
             return &iter->second;
         } else if (ends_with(name, "[]")) {
             auto element = get_type(abi_types, name.substr(0, name.size() - 2), depth + 1);
-            sysio::check(!holds_any_alternative<abi_type::optional, abi_type::array, abi_type::extension>(element->_data),
-                  sysio::convert_abi_error(abi_error::invalid_nesting));
+            // removed abi_type::array from invalid types for nesting, array of arrays should work
+            sysio::check(
+                !holds_any_alternative<abi_type::optional, abi_type::extension>(element->_data),
+                "Invalid array nesting for type: " + name
+            );
             auto [iter, success] = abi_types.try_emplace(name, name, abi_type::array{element}, &abi_serializer_for< ::abieos::pseudo_array>);
             return &iter->second;
+        } else if (ends_with(name, "]")) {
+            // fixed_array
+            int size = 0;
+            if (auto idx = name.find_last_of('['); idx != std::string::npos) {
+                const char* last = &name[name.size() - 1];
+                auto fc_res = std::from_chars(&name[idx + 1], last, size);
+                check (fc_res.ec == std::errc{}, "Unexpected size specification for fixed array type");
+                check(fc_res.ptr == last, "Unexpected size specification for fixed array type");
+                if (size <= 0) {
+                    sysio::check(size != 0, "Zero size fixed arrays not allowed");
+                    sysio::check(size > 0, "Negative size fixed arrays not allowed");
+                } else {
+                    sysio::check(name[idx + 1] != '0', "Leading zeros not allowed for fixed array lengrh specification");
+                }
+                auto element = get_type(abi_types, name.substr(0, idx), depth + 1);
+                // removed abi_type::array from invalid types for nesting, array of arrays should work
+                sysio::check(!holds_any_alternative<abi_type::optional, abi_type::extension>(element->_data),
+                             "Invalid array nesting for type: " + name);
+                auto [iter, success] = abi_types.try_emplace(name, name, abi_type::fixed_array{element, size_t(size)},
+                                                             &abi_serializer_for<::abieos::pseudo_fixed_array>);
+                return &iter->second;
+            } else
+                sysio::check(false, "']' character found without matching '[' in type specification");
         } else if (ends_with(name, "$")) {
             auto base = get_type(abi_types, name.substr(0, name.size() - 1), depth + 1);
-            sysio::check(!std::holds_alternative<abi_type::extension>(base->_data),
-                  sysio::convert_abi_error(abi_error::invalid_nesting));
+            sysio::check(
+                !std::holds_alternative<abi_type::extension>(base->_data),
+                "Invalid extension nesting for type: " + name
+            );
             auto [iter, success] = abi_types.try_emplace(name, name, abi_type::extension{base}, &abi_serializer_for< ::abieos::pseudo_extension>);
             return &iter->second;
         } else
@@ -198,6 +228,7 @@ void sysio::convert(const abi_def& abi, sysio::abi& c) {
 void to_abi_def(abi_def& def, const std::string& name, const abi_type::builtin&) {}
 void to_abi_def(abi_def& def, const std::string& name, const abi_type::optional&) {}
 void to_abi_def(abi_def& def, const std::string& name, const abi_type::array&) {}
+void to_abi_def(abi_def& def, const std::string& name, const abi_type::fixed_array&) {}
 void to_abi_def(abi_def& def, const std::string& name, const abi_type::extension&) {}
 
 template<typename T>
@@ -243,6 +274,7 @@ void sysio::convert(const sysio::abi& abi, sysio::abi_def& def) {
 const abi_serializer* const sysio::object_abi_serializer = &abi_serializer_for< ::abieos::pseudo_object>;
 const abi_serializer* const sysio::variant_abi_serializer = &abi_serializer_for< ::abieos::pseudo_variant>;
 const abi_serializer* const sysio::array_abi_serializer = &abi_serializer_for< ::abieos::pseudo_array>;
+const abi_serializer* const sysio::fixed_array_abi_serializer = &abi_serializer_for< ::abieos::pseudo_fixed_array>;
 const abi_serializer* const sysio::extension_abi_serializer = &abi_serializer_for< ::abieos::pseudo_extension>;
 const abi_serializer* const sysio::optional_abi_serializer = &abi_serializer_for< ::abieos::pseudo_optional>;
 

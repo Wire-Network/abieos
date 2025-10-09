@@ -14,6 +14,7 @@
 #include "time.hpp"
 #include "bytes.hpp"
 #include "asset.hpp"
+#include "bitset.hpp"
 
 namespace sysio {
 
@@ -196,13 +197,16 @@ struct abi_type {
    struct array {
       abi_type* type;
    };
+   struct fixed_array {
+      abi_type* type;
+      size_t    size;
+   };
    struct struct_ {
       abi_type*              base = nullptr;
       std::vector<abi_field> fields;
    };
    using variant = std::vector<abi_field>;
-   std::variant<builtin, const alias_def*, const struct_def*, const variant_def*, alias, optional, extension, array,
-                struct_, variant>
+   std::variant<builtin, const alias_def*, const struct_def*, const variant_def*, alias, optional, extension, array, struct_, variant, fixed_array>
                          _data;
    const abi_serializer* ser = nullptr;
 
@@ -228,6 +232,18 @@ struct abi_type {
    const abi_type* array_of() const {
       if (auto* t = std::get_if<array>(&_data))
          return t->type;
+      else
+         return nullptr;
+   }
+   const abi_type* fixed_array_of() const {
+      if (auto* t = std::get_if<fixed_array>(&_data))
+         return t->type;
+      else
+         return nullptr;
+   }
+   const fixed_array* as_fixed_array() const {
+      if (auto* t = std::get_if<fixed_array>(&_data))
+         return t;
       else
          return nullptr;
    }
@@ -263,6 +279,7 @@ void convert(const abi& def, abi_def&);
 extern const abi_serializer* const object_abi_serializer;
 extern const abi_serializer* const variant_abi_serializer;
 extern const abi_serializer* const array_abi_serializer;
+extern const abi_serializer* const fixed_array_abi_serializer;
 extern const abi_serializer* const extension_abi_serializer;
 extern const abi_serializer* const optional_abi_serializer;
 
@@ -270,7 +287,7 @@ using basic_abi_types =
       std::tuple<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, __int128, unsigned __int128,
                varuint32, varint32, float, double, float128, time_point, time_point_sec, block_timestamp, name,
                bytes, std::string, checksum160, checksum256, checksum256, checksum512, public_key, private_key, signature,
-               symbol, symbol_code, asset>;
+               symbol, symbol_code, asset, bitset>;
 
 namespace detail {
    template <typename U, typename... T>
@@ -310,6 +327,17 @@ abi_type* add_type(abi& a, std::vector<T>*) {
          convert_abi_error(abi_error::invalid_nesting));
    std::string name      = get_type_name((std::vector<T>*)nullptr);
    auto [iter, inserted] = a.abi_types.try_emplace(name, name, abi_type::array{ element_type }, array_abi_serializer);
+   return &iter->second;
+}
+
+template <typename T, size_t SZ>
+abi_type* add_type(abi& a, std::array<T, SZ>*) {
+   auto element_type = a.add_type<T>();
+   check(!(element_type->optional_of() || element_type->extension_of()),
+         convert_abi_error(abi_error::invalid_nesting));
+   std::string name      = get_type_name((std::array<T, SZ>*)nullptr);
+   auto [iter, inserted] =
+         a.abi_types.try_emplace(name, name, abi_type::fixed_array{ element_type, SZ }, fixed_array_abi_serializer);
    return &iter->second;
 }
 

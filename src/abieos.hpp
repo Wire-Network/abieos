@@ -18,6 +18,7 @@
 #include <sysio/fixed_bytes.hpp>
 #include <sysio/float.hpp>
 #include <sysio/varint.hpp>
+#include <sysio/bitset.hpp>
 
 #ifdef __sysio_cdt__
 #include <cwchar>
@@ -61,6 +62,7 @@ struct pseudo_optional;
 struct pseudo_extension;
 struct pseudo_object;
 struct pseudo_array;
+struct pseudo_fixed_array;
 struct pseudo_variant;
 
 // !!!
@@ -321,12 +323,16 @@ void json_to_bin(pseudo_object*, jvalue_to_bin_state& state, bool allow_extensio
                                 const abi_type* type, bool start);
 void json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool allow_extensions,
                                 const abi_type* type, bool start);
+void json_to_bin(pseudo_fixed_array*, jvalue_to_bin_state& state, bool allow_extensions,
+                                const abi_type* type, bool start);
 void json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_extensions,
                                 const abi_type* type, bool start);
 
 void json_to_bin(pseudo_object*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
                                 bool start);
 void json_to_bin(pseudo_array*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
+                                bool start);
+void json_to_bin(pseudo_fixed_array*, json_to_bin_state& state, bool allow_extensions, const abi_type* type,
                                 bool start);
 void json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_extensions,
                                 const abi_type* type, bool start);
@@ -338,6 +344,8 @@ void bin_to_json(pseudo_extension*, bin_to_json_state& state, bool allow_extensi
 void bin_to_json(pseudo_object*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
                                 bool start);
 void bin_to_json(pseudo_array*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
+                                bool start);
+void bin_to_json(pseudo_fixed_array*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
                                 bool start);
 void bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_extensions,
                                 const abi_type* type, bool start);
@@ -385,6 +393,7 @@ using sysio::name;
 
 using sysio::varuint32;
 using sysio::varint32;
+using sysio::bitset;
 
 using sysio::time_point;
 using sysio::time_point_sec;
@@ -458,7 +467,7 @@ using extensions_type = std::vector<std::pair<uint16_t, bytes>>;
 using sysio::abi_def;
 
 ABIEOS_NODISCARD inline bool check_abi_version(const std::string& s, std::string& error) {
-    if (s.substr(0, 13) != "sysio::abi/1." && s.substr(0, 13) != "eosio::abi/1.")
+   if (auto prefix = s.substr(0, 13); prefix != "sysio::abi/1." && prefix != "sysio::abi/2." && prefix != "eosio::abi/1." && prefix != "eosio::abi/2.")
         return set_error(error, "unsupported abi version");
     return true;
 }
@@ -681,6 +690,34 @@ inline void json_to_bin(pseudo_array*, jvalue_to_bin_state& state, bool, const a
     return t->ser->json_to_bin(state, false, t, true);
 }
 
+inline void json_to_bin(pseudo_fixed_array*, jvalue_to_bin_state& state, bool, const abi_type* type,
+                        bool start) {
+    const abi_type::fixed_array* fa = type->as_fixed_array();
+    if (start) {
+        sysio::check(!(!state.received_value || !std::holds_alternative<jarray>(state.received_value->value)),
+                     sysio::convert_json_error(sysio::from_json_error::expected_start_array));
+        auto& value {std::get<jarray>(state.received_value->value)};
+        if (trace_jvalue_to_bin)
+            printf("%*s[ %d elements\n", int(state.stack.size() * 4), "", int(value.size()));
+        sysio::check(value.size() == fa->size, "incorrect size for fixed array");
+        state.stack.push_back({type, false, state.received_value, -1});
+    }
+    auto& stack_entry = state.stack.back();
+    auto& arr = std::get<jarray>(stack_entry.value->value);
+    ++stack_entry.position;
+    if (stack_entry.position == (int)arr.size()) {
+        if (trace_jvalue_to_bin)
+            printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
+        state.stack.pop_back();
+        return;
+    }
+    state.received_value = &arr[stack_entry.position];
+    if (trace_jvalue_to_bin)
+        printf("%*sitem\n", int(state.stack.size() * 4), "");
+    const abi_type* t = type->fixed_array_of();
+    t->ser->json_to_bin(state, false, t, true);
+}
+
 inline void json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_extensions,
                                        const abi_type* type, bool start) {
     if (start) {
@@ -840,6 +877,31 @@ inline void json_to_bin(pseudo_array*, json_to_bin_state& state, bool, const abi
     t->ser->json_to_bin(state, false, t, true);
 }
 
+inline void json_to_bin(pseudo_fixed_array*, json_to_bin_state& state, bool, const abi_type* type,
+                        bool start) {
+    if (start) {
+        state.get_start_array();
+        if (trace_json_to_bin)
+            printf("%*s[\n", int(state.stack.size() * 4), "");
+        state.stack.push_back({type, false});
+        return;
+    }
+    auto& stack_entry = state.stack.back();
+    if (state.get_end_array_pred()) {
+        if (trace_json_to_bin)
+            printf("%*s]\n", int((state.stack.size() - 1) * 4), "");
+        const abi_type::fixed_array* fa = type->as_fixed_array();
+        sysio::check(stack_entry.position + 1 == (int)fa->size, "incorrect size for fixed array");
+        state.stack.pop_back();
+        return;
+    }
+    ++stack_entry.position;
+    if (trace_json_to_bin)
+        printf("%*sitem\n", int(state.stack.size() * 4), "");
+    const abi_type* t = type->fixed_array_of();
+    t->ser->json_to_bin(state, false, t, true);
+}
+
 inline void json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_extensions,
                                        const abi_type* type, bool start) {
     if (start) {
@@ -972,6 +1034,31 @@ inline void bin_to_json(pseudo_array*, bin_to_json_state& state, bool, const abi
         return state.writer.write(']');
     }
 }
+
+inline void bin_to_json(pseudo_fixed_array*, bin_to_json_state& state, bool, const abi_type* type,
+                        bool start) {
+    const abi_type::fixed_array* fa = type->as_fixed_array();
+    if (start) {
+        state.stack.push_back({type, false});
+        if (trace_bin_to_json)
+            printf("%*s[ %d items\n", int(state.stack.size() * 4), "", int(fa->size));
+        return state.writer.write('[');
+    }
+    auto& stack_entry = state.stack.back();
+    if (++stack_entry.position < int(fa->size)) {
+        if (trace_bin_to_json)
+            printf("%*sitem %d/%d %p %s\n", int(state.stack.size() * 4), "", int(stack_entry.position),
+                   int(fa->size), type->fixed_array_of()->ser, type->fixed_array_of()->name.c_str());
+        if (stack_entry.position != 0) { state.writer.write(','); }
+        return bin_to_json(state, false, type->fixed_array_of(), true);
+    } else {
+        if (trace_bin_to_json)
+            printf("%*s]\n", int((state.stack.size()) * 4), "");
+        state.stack.pop_back();
+        return state.writer.write(']');
+    }
+}
+
 
 inline void bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_extensions,
                                          const abi_type* type, bool start) {
