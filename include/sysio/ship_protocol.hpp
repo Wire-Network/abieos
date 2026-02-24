@@ -1,6 +1,7 @@
 #pragma once
 
 #include "abi.hpp"
+#include "bitset.hpp"
 #include "check.hpp"
 #include "crypto.hpp"
 #include "fixed_bytes.hpp"
@@ -331,12 +332,10 @@ namespace sysio { namespace ship_protocol {
    SYSIO_REFLECT(producer_schedule, version, producers)
 
    struct transaction_receipt_header {
-      transaction_status status          = {};
-      uint32_t           cpu_usage_us    = {};
-      sysio::varuint32   net_usage_words = {};
+      std::vector<sysio::varuint32> cpu_usage_us = {};
    };
 
-   SYSIO_REFLECT(transaction_receipt_header, status, cpu_usage_us, net_usage_words)
+   SYSIO_REFLECT(transaction_receipt_header, cpu_usage_us)
 
    struct packed_transaction {
       std::vector<sysio::signature> signatures               = {};
@@ -347,49 +346,118 @@ namespace sysio { namespace ship_protocol {
 
    SYSIO_REFLECT(packed_transaction, signatures, compression, packed_context_free_data, packed_trx)
 
-   using transaction_variant_v0 = std::variant<sysio::checksum256, packed_transaction>;
-
-   struct transaction_receipt_v0 : transaction_receipt_header {
-      transaction_variant_v0 trx = {};
-   };
-
-   SYSIO_REFLECT(transaction_receipt_v0, base transaction_receipt_header, trx)
-
-   using transaction_variant = std::variant<sysio::checksum256, packed_transaction>;
-
    struct transaction_receipt : transaction_receipt_header {
-      transaction_variant trx = {};
+      packed_transaction trx = {};
    };
 
    SYSIO_REFLECT(transaction_receipt, base transaction_receipt_header, trx)
 
-   struct block_header {
-      sysio::block_timestamp           timestamp{};
-      sysio::name                      producer          = {};
-      uint16_t                         confirmed         = {};
-      sysio::checksum256               previous          = {};
-      sysio::checksum256               transaction_mroot = {};
-      sysio::checksum256               action_mroot      = {};
-      uint32_t                         schedule_version  = {};
-      std::optional<producer_schedule> new_producers     = {};
-      std::vector<extension>           header_extensions = {};
+   struct qc_claim {
+      uint32_t  block_num    = {};
+      bool      is_strong_qc = {};
    };
 
-   SYSIO_REFLECT(block_header, timestamp, producer, confirmed, previous, transaction_mroot, action_mroot,
-                 schedule_version, new_producers, header_extensions)
+   SYSIO_REFLECT(qc_claim, block_num, is_strong_qc)
+
+   struct insert_finalizer_policy_index_pair {
+      uint16_t            index = {};
+      finalizer_authority value = {};
+   };
+
+   SYSIO_REFLECT(insert_finalizer_policy_index_pair, index, value)
+
+   struct finalizer_policy_diff {
+      uint32_t                                        generation     = {};
+      uint64_t                                        threshold      = {};
+      std::vector<uint16_t>                           remove_indexes = {};
+      std::vector<insert_finalizer_policy_index_pair> insert_indexes = {};
+   };
+
+   SYSIO_REFLECT(finalizer_policy_diff, generation, threshold, remove_indexes, insert_indexes)
+
+   struct insert_proposer_policy_index_pair {
+      uint16_t           index = {};
+      producer_authority value = {};
+   };
+
+   SYSIO_REFLECT(insert_proposer_policy_index_pair, index, value)
+
+   struct proposer_policy_diff {
+      uint32_t                                       version        = {};
+      sysio::block_timestamp                         proposal_time  = {};
+      std::vector<uint16_t>                          remove_indexes = {};
+      std::vector<insert_proposer_policy_index_pair> insert_indexes = {};
+   };
+
+   SYSIO_REFLECT(proposer_policy_diff, version, proposal_time, remove_indexes, insert_indexes)
+
+   struct qc_claim_t {
+      uint32_t block_num    = {};
+      bool     is_strong_qc = {};
+   };
+
+   SYSIO_REFLECT(qc_claim_t, block_num, is_strong_qc)
+
+   struct qc_sig_t {
+      std::optional<sysio::bitset> strong_votes = {};
+      std::optional<sysio::bitset> weak_votes   = {};
+      sysio::input_stream          sig          = {};
+   };
+
+   SYSIO_REFLECT(qc_sig_t, strong_votes, weak_votes, sig)
+
+   struct qc_t {
+      uint32_t                block_num          = {};
+      qc_sig_t                active_policy_sig  = {};
+      std::optional<qc_sig_t> pending_policy_sig = {};
+   };
+
+   SYSIO_REFLECT(qc_t, block_num, active_policy_sig, pending_policy_sig)
+
+   struct s_header {
+      sysio::name        contract_name      = {};
+      sysio::checksum256 previous_s_id      = {};
+      sysio::checksum256 current_s_id       = {};
+      sysio::checksum256 current_s_root     = {};
+      uint32_t           previous_block_num = {};
+   };
+
+   SYSIO_REFLECT(s_header, contract_name, previous_s_id, current_s_id, current_s_root, previous_block_num)
+
+   struct s_root_extension {
+      s_header s_header_data = {};
+   };
+
+   SYSIO_REFLECT(s_root_extension, s_header_data)
+
+   struct block_header {
+      sysio::block_timestamp                  timestamp{};
+      sysio::name                             producer                  = {};
+      sysio::checksum256                      previous                  = {};
+      sysio::checksum256                      transaction_mroot         = {};
+      sysio::checksum256                      finality_mroot            = {};
+      qc_claim_t                              qc_claim                  = {};
+      std::optional<finalizer_policy_diff>    new_finalizer_policy_diff = {};
+      std::optional<proposer_policy_diff>     new_proposer_policy_diff  = {};
+      std::vector<extension>                  header_extensions         = {};
+   };
+
+   SYSIO_REFLECT(block_header, timestamp, producer, previous, transaction_mroot, finality_mroot,
+                 qc_claim, new_finalizer_policy_diff, new_proposer_policy_diff, header_extensions)
 
    struct signed_block_header : block_header {
-      sysio::signature producer_signature = {};
+      std::vector<sysio::signature> producer_signatures = {};
    };
 
-   SYSIO_REFLECT(signed_block_header, base block_header, producer_signature)
+   SYSIO_REFLECT(signed_block_header, base block_header, producer_signatures)
 
    struct signed_block : signed_block_header {
-      std::vector<transaction_receipt_v0> transactions     = {};
-      std::vector<extension>              block_extensions = {};
+      std::vector<transaction_receipt> transactions     = {};
+      std::optional<qc_t>             qc               = {};
+      std::vector<extension>          block_extensions = {};
    };
 
-   SYSIO_REFLECT(signed_block, base signed_block_header, transactions, block_extensions)
+   SYSIO_REFLECT(signed_block, base signed_block_header, transactions, qc, block_extensions)
 
    using result = std::variant<get_status_result_v0, get_blocks_result_v0, get_blocks_result_v1, get_status_result_v1>;
 
@@ -877,54 +945,7 @@ namespace sysio { namespace ship_protocol {
 
    SYSIO_REFLECT(producer_schedule_change_extension, base producer_authority_schedule);
 
-   struct qc_claim {
-      uint32_t  block_num    = {};
-      bool      is_strong_qc = {};
-   };
-
-   SYSIO_REFLECT(qc_claim, block_num, is_strong_qc)
-
-   struct insert_finalizer_policy_index_pair {
-      uint16_t            index = {};
-      finalizer_authority value = {};
-   };
-
-   SYSIO_REFLECT(insert_finalizer_policy_index_pair, index, value)
-
-   struct finalizer_policy_diff {
-      uint32_t                                        generation     = {};
-      uint64_t                                        threshold      = {};
-      std::vector<uint16_t>                           remove_indexes = {};
-      std::vector<insert_finalizer_policy_index_pair> insert_indexes = {};
-   };
-
-   SYSIO_REFLECT(finalizer_policy_diff, generation, threshold, remove_indexes, insert_indexes)
-
-   struct insert_proposer_policy_index_pair {
-      uint16_t           index = {};
-      producer_authority value = {};
-   };
-
-   SYSIO_REFLECT(insert_proposer_policy_index_pair, index, value)
-
-   struct proposer_policy_diff {
-      uint32_t                                       version        = {};
-      sysio::block_timestamp                         proposal_time  = {};
-      std::vector<uint16_t>                          remove_indexes = {};
-      std::vector<insert_proposer_policy_index_pair> insert_indexes = {};
-   };
-
-   SYSIO_REFLECT(proposer_policy_diff, version, proposal_time, remove_indexes, insert_indexes)
-
-   struct finality_extension {
-      ship_protocol::qc_claim              qc_claim                  = {};
-      std::optional<finalizer_policy_diff> new_finalizer_policy_diff = {};
-      std::optional<proposer_policy_diff>  new_proposer_policy_diff  = {};
-   };
-
-   SYSIO_REFLECT(finality_extension, qc_claim, new_finalizer_policy_diff, new_proposer_policy_diff)
-
-   using block_header_extension = std::variant<protocol_feature_activation_extension, producer_schedule_change_extension, finality_extension>;
+   using block_header_extension = std::variant<protocol_feature_activation_extension, s_root_extension>;
 
 }} // namespace sysio::ship_protocol
 
