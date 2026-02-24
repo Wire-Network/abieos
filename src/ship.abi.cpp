@@ -204,14 +204,12 @@ extern const char* const state_history_plugin_abi = R"({
         },
         {
             "name": "transaction_receipt_header", "fields": [
-                { "name": "status", "type": "uint8" },
-                { "name": "cpu_usage_us", "type": "uint32" },
-                { "name": "net_usage_words", "type": "varuint32" }
+                { "name": "cpu_usage_us", "type": "varuint32[]" }
             ]
         },
         {
             "name": "transaction_receipt", "base": "transaction_receipt_header", "fields": [
-                { "name": "trx", "type": "transaction_variant" }
+                { "name": "trx", "type": "packed_transaction" }
             ]
         },
         {
@@ -221,26 +219,47 @@ extern const char* const state_history_plugin_abi = R"({
             ]
         },
         {
+            "name": "qc_claim_t", "fields": [
+                { "name": "block_num", "type": "uint32" },
+                { "name": "is_strong_qc", "type": "bool" }
+            ]
+        },
+        {
+            "name": "qc_sig_t", "fields": [
+                { "name": "strong_votes", "type": "bitset?" },
+                { "name": "weak_votes", "type": "bitset?" },
+                { "name": "sig", "type": "bytes" }
+            ]
+        },
+        {
+            "name": "qc_t", "fields": [
+                { "name": "block_num", "type": "uint32" },
+                { "name": "active_policy_sig", "type": "qc_sig_t" },
+                { "name": "pending_policy_sig", "type": "qc_sig_t?" }
+            ]
+        },
+        {
             "name": "block_header", "fields": [
                 { "name": "timestamp", "type": "block_timestamp_type" },
                 { "name": "producer", "type": "name" },
-                { "name": "confirmed", "type": "uint16" },
                 { "name": "previous", "type": "checksum256" },
                 { "name": "transaction_mroot", "type": "checksum256" },
-                { "name": "action_mroot", "type": "checksum256" },
-                { "name": "schedule_version", "type": "uint32" },
-                { "name": "new_producers", "type": "producer_schedule?" },
+                { "name": "finality_mroot", "type": "checksum256" },
+                { "name": "qc_claim", "type": "qc_claim_t" },
+                { "name": "new_finalizer_policy_diff", "type": "finalizer_policy_diff?" },
+                { "name": "new_proposer_policy_diff", "type": "proposer_policy_diff?" },
                 { "name": "header_extensions", "type": "extension[]" }
             ]
         },
         {
             "name": "signed_block_header", "base": "block_header", "fields": [
-                { "name": "producer_signature", "type": "signature" }
+                { "name": "producer_signatures", "type": "signature[]" }
             ]
         },
         {
             "name": "signed_block", "base": "signed_block_header", "fields": [
                 { "name": "transactions", "type": "transaction_receipt[]" },
+                { "name": "qc", "type": "qc_t?" },
                 { "name": "block_extensions", "type": "extension[]" }
             ]
         },
@@ -630,6 +649,20 @@ extern const char* const state_history_plugin_abi = R"({
             ]
         },
         {
+            "name": "s_header", "fields": [
+                { "name": "contract_name", "type": "name" },
+                { "name": "previous_s_id", "type": "checksum256" },
+                { "name": "current_s_id", "type": "checksum256" },
+                { "name": "current_s_root", "type": "checksum256" },
+                { "name": "previous_block_num", "type": "uint32" }
+            ]
+        },
+        {
+            "name": "s_root_extension", "fields": [
+                { "name": "s_header_data", "type": "s_header" }
+            ]
+        },
+        {
             "name": "producer_schedule_change_extension", "base": "producer_authority_schedule", "fields": []
         },
         {
@@ -665,13 +698,6 @@ extern const char* const state_history_plugin_abi = R"({
                 { "name": "remove_indexes", "type": "uint16[]" },
                 { "name": "insert_indexes", "type": "insert_proposer_policy_index_pair[]" }
             ]
-        },
-        {
-            "name": "finality_extension", "fields": [
-                { "name": "qc_claim", "type": "qc_claim" },
-                { "name": "new_finalizer_policy_diff", "type": "finalizer_policy_diff?" },
-                { "name": "new_proposer_policy_diff", "type": "proposer_policy_diff?" }
-            ]
         }
     ],
     "types": [
@@ -685,8 +711,6 @@ extern const char* const state_history_plugin_abi = R"({
         { "name": "action_trace", "types": ["action_trace_v0", "action_trace_v1"] },
         { "name": "partial_transaction", "types": ["partial_transaction_v0"] },
         { "name": "transaction_trace", "types": ["transaction_trace_v0"] },
-        { "name": "transaction_variant", "types": ["transaction_id", "packed_transaction"] },
-
         { "name": "table_delta", "types": ["table_delta_v0"] },
         { "name": "account", "types": ["account_v0"] },
         { "name": "account_metadata", "types": ["account_metadata_v0"] },
@@ -714,7 +738,7 @@ extern const char* const state_history_plugin_abi = R"({
         { "name": "elastic_limit_parameters", "types": ["elastic_limit_parameters_v0"] },
         { "name": "resource_limits_config", "types": ["resource_limits_config_v0"] },
         { "name": "block_signing_authority", "types": ["block_signing_authority_v0"] },
-        { "name": "block_header_extension", "types": ["protocol_feature_activation_extension", "producer_schedule_change_extension", "finality_extension"] }
+        { "name": "block_header_extension", "types": ["protocol_feature_activation_extension", "s_root_extension"] }
     ],
     "tables": [
         { "name": "account", "type": "account", "key_names": ["name"] },
