@@ -3,6 +3,13 @@
 cmake_minimum_required (VERSION 3.16...4.0)
 project(abieos VERSION 0.1 LANGUAGES CXX C)
 
+if (NOT TARGET rapidjson)
+    find_package(RapidJSON REQUIRED)
+    if(NOT TARGET rapidjson)
+        message(FATAL_ERROR "RapidJSON not found!")
+    endif()
+endif()
+
 set(default_build_type "Release")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -38,8 +45,9 @@ include(GNUInstallDirs)
 add_library(abieos STATIC src/abi.cpp src/crypto.cpp)
 target_include_directories(abieos PUBLIC
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include" 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include"
                           "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+
+target_link_libraries(abieos rapidjson)
 
 if(ABIEOS_NO_INT128)
 target_compile_definitions(abieos PUBLIC ABIEOS_NO_INT128)
@@ -48,10 +56,10 @@ endif()
 add_library(abieos_module MODULE src/abieos.cpp src/abi.cpp src/crypto.cpp)
 target_include_directories(abieos_module PUBLIC
                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include;" 
-                          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/rapidjson/include" 
+
                           "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(abieos_module ${CMAKE_THREAD_LIBS_INIT} rapidjson)
 set_target_properties(abieos_module PROPERTIES OUTPUT_NAME "abieos")
 
 enable_testing()
