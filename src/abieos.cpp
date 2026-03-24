@@ -298,6 +298,169 @@ extern "C" const char* abieos_abi_bin_to_json(abieos_context* context, const cha
     });
 }
 
+// --- Big-endian KV key decoder ---
+// Decodes keys produced by CDT's kv::map be_key_stream encoding:
+//   integers: big-endian, doubles: sign-flipped BE, strings: null-terminated, bools: 1 byte.
+
+namespace {
+
+uint64_t read_be64(const char*& pos, const char* end) {
+    if (pos + 8 > end) throw std::runtime_error("be_key: unexpected end of data reading uint64");
+    uint64_t v = 0;
+    for (int i = 0; i < 8; ++i) v = (v << 8) | static_cast<uint8_t>(*pos++);
+    return v;
+}
+
+uint32_t read_be32(const char*& pos, const char* end) {
+    if (pos + 4 > end) throw std::runtime_error("be_key: unexpected end of data reading uint32");
+    uint32_t v = 0;
+    for (int i = 0; i < 4; ++i) v = (v << 8) | static_cast<uint8_t>(*pos++);
+    return v;
+}
+
+uint16_t read_be16(const char*& pos, const char* end) {
+    if (pos + 2 > end) throw std::runtime_error("be_key: unexpected end of data reading uint16");
+    uint16_t v = 0;
+    for (int i = 0; i < 2; ++i) v = (v << 8) | static_cast<uint8_t>(*pos++);
+    return v;
+}
+
+uint8_t read_be8(const char*& pos, const char* end) {
+    if (pos + 1 > end) throw std::runtime_error("be_key: unexpected end of data reading uint8");
+    return static_cast<uint8_t>(*pos++);
+}
+
+std::string read_null_terminated(const char*& pos, const char* end) {
+    const char* start = pos;
+    while (pos < end && *pos != '\0') ++pos;
+    std::string result(start, pos);
+    if (pos < end) ++pos; // skip null terminator
+    return result;
+}
+
+void decode_be_field(const std::string& type, const char*& pos, const char* end, std::string& out) {
+    if (type == "uint8") {
+        out += std::to_string(read_be8(pos, end));
+    } else if (type == "int8") {
+        out += std::to_string(static_cast<int8_t>(read_be8(pos, end)));
+    } else if (type == "uint16") {
+        out += std::to_string(read_be16(pos, end));
+    } else if (type == "int16") {
+        out += std::to_string(static_cast<int16_t>(read_be16(pos, end)));
+    } else if (type == "uint32") {
+        out += std::to_string(read_be32(pos, end));
+    } else if (type == "int32") {
+        out += std::to_string(static_cast<int32_t>(read_be32(pos, end)));
+    } else if (type == "uint64") {
+        out += "\"" + std::to_string(read_be64(pos, end)) + "\"";
+    } else if (type == "int64") {
+        out += "\"" + std::to_string(static_cast<int64_t>(read_be64(pos, end))) + "\"";
+    } else if (type == "uint128") {
+        uint64_t hi = read_be64(pos, end);
+        uint64_t lo = read_be64(pos, end);
+        // Output as hex string
+        char buf[35];
+        snprintf(buf, sizeof(buf), "0x%016llx%016llx",
+                 (unsigned long long)hi, (unsigned long long)lo);
+        out += "\"";
+        out += buf;
+        out += "\"";
+    } else if (type == "name") {
+        uint64_t raw = read_be64(pos, end);
+        out += "\"" + sysio::name_to_string(raw) + "\"";
+    } else if (type == "float64" || type == "double") {
+        uint64_t bits = read_be64(pos, end);
+        // Reverse sign-flip: positive had sign bit flipped, negative had all bits flipped
+        if (bits >> 63) bits ^= (uint64_t(1) << 63); // was positive: unflip sign bit
+        else            bits = ~bits;                   // was negative: unflip all
+        double v;
+        std::memcpy(&v, &bits, 8);
+        out += std::to_string(v);
+    } else if (type == "string") {
+        std::string s = read_null_terminated(pos, end);
+        // JSON-escape the string
+        out += "\"";
+        for (char c : s) {
+            if (c == '"') out += "\\\"";
+            else if (c == '\\') out += "\\\\";
+            else if (c == '\n') out += "\\n";
+            else if (c == '\r') out += "\\r";
+            else if (c == '\t') out += "\\t";
+            else out += c;
+        }
+        out += "\"";
+    } else if (type == "bool") {
+        out += (read_be8(pos, end) ? "true" : "false");
+    } else {
+        throw std::runtime_error("be_key: unsupported type \"" + type + "\"");
+    }
+}
+
+// Parse a simple JSON string array: ["a","b","c"]
+std::vector<std::string> parse_json_string_array(const char* json) {
+    std::vector<std::string> result;
+    if (!json) return result;
+    const char* p = json;
+    while (*p && *p != '[') ++p;
+    if (!*p) return result;
+    ++p; // skip '['
+    while (*p) {
+        while (*p && (*p == ' ' || *p == ',')) ++p;
+        if (*p == ']') break;
+        if (*p == '"') {
+            ++p;
+            std::string s;
+            while (*p && *p != '"') {
+                if (*p == '\\' && *(p+1)) { s += *(p+1); p += 2; }
+                else { s += *p; ++p; }
+            }
+            if (*p == '"') ++p;
+            result.push_back(std::move(s));
+        } else {
+            ++p;
+        }
+    }
+    return result;
+}
+
+} // anonymous namespace
+
+extern "C" const char* abieos_be_key_hex_to_json(abieos_context* context, const char* key_names_json,
+                                                   const char* key_types_json, const char* hex) {
+    fix_null_str(key_names_json);
+    fix_null_str(key_types_json);
+    fix_null_str(hex);
+    return handle_exceptions(context, nullptr, [&]() -> const char* {
+        auto names = parse_json_string_array(key_names_json);
+        auto types = parse_json_string_array(key_types_json);
+        if (names.size() != types.size())
+            throw std::runtime_error("be_key: key_names and key_types must have the same length");
+        if (names.empty())
+            throw std::runtime_error("be_key: key_names/key_types are empty");
+
+        std::vector<char> data;
+        std::string error;
+        if (!unhex(error, hex, hex + strlen(hex), std::back_inserter(data))) {
+            set_error(context, error.empty() ? "invalid hex" : std::move(error));
+            return nullptr;
+        }
+
+        const char* pos = data.data();
+        const char* end = pos + data.size();
+
+        std::string json = "{";
+        for (size_t i = 0; i < names.size(); ++i) {
+            if (i > 0) json += ",";
+            json += "\"" + names[i] + "\":";
+            decode_be_field(types[i], pos, end, json);
+        }
+        json += "}";
+
+        context->result_str = std::move(json);
+        return context->result_str.c_str();
+    });
+}
+
 extern "C" abieos_bool abieos_delete_contract(abieos_context* context, uint64_t contract) {
     auto itr = context->contracts.find(::abieos::name{contract});
     if(itr == context->contracts.end()) {
