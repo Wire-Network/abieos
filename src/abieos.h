@@ -82,6 +82,15 @@ const char* abieos_abi_bin_to_json(abieos_context* context, const char* abi_bin_
 // Delete a contract from the context
 abieos_bool abieos_delete_contract(abieos_context* context, uint64_t contract);
 
+// Decode big-endian encoded KV key bytes to JSON.
+// key_names: JSON array of field names, e.g. '["region","id"]'
+// key_types: JSON array of type names, e.g. '["string","uint64"]'
+// hex: hex-encoded key bytes
+// Returns JSON object, e.g. '{"region":"us-east","id":42}'. The context owns the returned string.
+// Returns null on error; use abieos_get_error to retrieve error.
+const char* abieos_be_key_hex_to_json(abieos_context* context, const char* key_names, const char* key_types,
+                                      const char* hex);
+
 #ifdef __cplusplus
 }
 #endif
