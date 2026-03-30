@@ -149,6 +149,22 @@ abi_type::variant resolve(std::map<std::string, abi_type>& abi_types, const vari
     return result;
 }
 
+bool is_integer_type(const std::string& name) {
+   return name == "uint8" || name == "int8" || name == "uint16" || name == "int16" ||
+          name == "uint32" || name == "int32" || name == "uint64" || name == "int64";
+}
+
+abi_type::enum_ resolve(std::map<std::string, abi_type>& abi_types, const enum_def* type, int depth) {
+   sysio::check(depth < 32, sysio::convert_abi_error(abi_error::recursion_limit_reached));
+   auto* underlying = get_type(abi_types, type->type, depth + 1);
+   sysio::check(is_integer_type(underlying->name),
+       "Enum '" + type->name + "' has unsupported underlying type '" + type->type + "'; must be an integer type");
+   abi_type::enum_ result{underlying, {}};
+   for (auto& ev : type->values)
+      result.values.emplace_back(ev.name, ev.value);
+   return result;
+}
+
 abi_type::alias resolve(std::map<std::string, abi_type>& abi_types, const abi_type::alias_def* type, int depth) {
     auto t = get_type(abi_types, *type, depth + 1);
     sysio::check(!std::holds_alternative<abi_type::extension>(t->_data),
@@ -220,6 +236,13 @@ void sysio::convert(const abi_def& abi, sysio::abi& c) {
         sysio::check(inserted,
             sysio::convert_abi_error(abi_error::redefined_type));
     }
+    for (auto& e : abi.enums.value) {
+       sysio::check(!e.name.empty(),
+            sysio::convert_abi_error(abi_error::missing_name));
+        auto [it, inserted] = c.abi_types.try_emplace(e.name, e.name, &e, &abi_serializer_for<::abieos::pseudo_enum>);
+        sysio::check(inserted,
+            sysio::convert_abi_error(abi_error::redefined_type));
+    }
     for (auto& [_, t] : c.abi_types) {
         fill(c.abi_types, t, 0);
     }
@@ -264,6 +287,15 @@ void to_abi_def(abi_def& def, const std::string& name, const abi_type::variant& 
    def.variants.value.push_back({name, std::move(types)});
 }
 
+void to_abi_def(abi_def& def, const std::string& name, const abi_type::enum_& e) {
+   enum_def ed;
+   ed.name = name;
+   ed.type = e.underlying_type->name;
+   for (auto& [n, v] : e.values)
+      ed.values.push_back({n, v});
+   def.enums.value.push_back(std::move(ed));
+}
+
 void sysio::convert(const sysio::abi& abi, sysio::abi_def& def) {
    def.version = "sysio::abi/1.0";
    for(auto& [name, type] : abi.abi_types) {
@@ -277,6 +309,7 @@ const abi_serializer* const sysio::array_abi_serializer = &abi_serializer_for< :
 const abi_serializer* const sysio::fixed_array_abi_serializer = &abi_serializer_for< ::abieos::pseudo_fixed_array>;
 const abi_serializer* const sysio::extension_abi_serializer = &abi_serializer_for< ::abieos::pseudo_extension>;
 const abi_serializer* const sysio::optional_abi_serializer = &abi_serializer_for< ::abieos::pseudo_optional>;
+const abi_serializer* const sysio::enum_abi_serializer = &abi_serializer_for< ::abieos::pseudo_enum>;
 
 std::vector<char> sysio::abi_type::json_to_bin_reorderable(std::string_view json, std::function<void()> f) const {
    abieos::jvalue tmp;

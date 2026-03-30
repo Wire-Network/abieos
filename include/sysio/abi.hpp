@@ -137,6 +137,21 @@ struct variant_def {
 
 SYSIO_REFLECT(variant_def, name, types);
 
+struct enum_value_def {
+   std::string name{};
+   int64_t     value{};
+};
+
+SYSIO_REFLECT(enum_value_def, name, value);
+
+struct enum_def {
+   std::string                 name{};
+   std::string                 type{};   // underlying type, e.g. "uint8"
+   std::vector<enum_value_def> values{};
+};
+
+SYSIO_REFLECT(enum_def, name, type, values);
+
 struct action_result_def {
    sysio::name name{};
    std::string result_type{};
@@ -168,10 +183,11 @@ struct abi_def {
    abi_extensions_type                                        abi_extensions{};
    might_not_exist<std::vector<variant_def>>                  variants{};
    might_not_exist<std::vector<action_result_def>>            action_results{};
+   might_not_exist<std::vector<enum_def>>                     enums{};
 };
 
 SYSIO_REFLECT(abi_def, version, types, structs, actions, tables, ricardian_clauses, error_messages, abi_extensions,
-              variants, action_results);
+              variants, action_results, enums);
 
 struct abi_type;
 
@@ -206,7 +222,11 @@ struct abi_type {
       std::vector<abi_field> fields;
    };
    using variant = std::vector<abi_field>;
-   std::variant<builtin, const alias_def*, const struct_def*, const variant_def*, alias, optional, extension, array, struct_, variant, fixed_array>
+   struct enum_ {
+      abi_type*                                    underlying_type;
+      std::vector<std::pair<std::string, int64_t>> values;
+   };
+   std::variant<builtin, const alias_def*, const struct_def*, const variant_def*, const enum_def*, alias, optional, extension, array, struct_, variant, fixed_array, enum_>
                          _data;
    const abi_serializer* ser = nullptr;
 
@@ -249,6 +269,7 @@ struct abi_type {
    }
    const struct_* as_struct() const { return std::get_if<struct_>(&_data); }
    const variant* as_variant() const { return std::get_if<variant>(&_data); }
+   const enum_* as_enum() const { return std::get_if<enum_>(&_data); }
 
    std::string bin_to_json(
          input_stream& bin, std::function<void()> f = [] {}) const;
@@ -282,6 +303,7 @@ extern const abi_serializer* const array_abi_serializer;
 extern const abi_serializer* const fixed_array_abi_serializer;
 extern const abi_serializer* const extension_abi_serializer;
 extern const abi_serializer* const optional_abi_serializer;
+extern const abi_serializer* const enum_abi_serializer;
 
 using basic_abi_types =
       std::tuple<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, __int128, unsigned __int128,
@@ -405,6 +427,7 @@ void to_json(const abi_def& def, S& stream) {
    to_json_write_helper(def.error_messages, "error_messages", true, stream);
    to_json_write_helper(def.variants.value, "variants", true, stream);
    to_json_write_helper(def.action_results.value, "action_results", true, stream);
+   to_json_write_helper(def.enums.value, "enums", true, stream);
    stream.write('}');
 }
 } // namespace sysio
