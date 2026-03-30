@@ -846,11 +846,11 @@ void check_types() {
     check_type(context, 0, "time_point", R"("2000-12-31T23:59:59.999999")", R"("2000-12-31T23:59:59.999")");
     check_error(context, "expected string containing time_point",
                 [&] { return abieos_json_to_bin(context, 0, "time_point", "true"); });
-    check_type(context, 0, "block_timestamp_type", R"("2000-01-01T00:00:00.000")");
-    check_type(context, 0, "block_timestamp_type", R"("2000-01-01T00:00:00.500")");
-    check_type(context, 0, "block_timestamp_type", R"("2000-01-01T00:00:01.000")");
-    check_type(context, 0, "block_timestamp_type", R"("2018-06-15T19:17:47.500")");
-    check_type(context, 0, "block_timestamp_type", R"("2018-06-15T19:17:48.000")");
+    check_type(context, 0, "block_timestamp_type", R"("2025-01-01T00:00:00.000")");
+    check_type(context, 0, "block_timestamp_type", R"("2025-01-01T00:00:00.500")");
+    check_type(context, 0, "block_timestamp_type", R"("2025-01-01T00:00:01.000")");
+    check_type(context, 0, "block_timestamp_type", R"("2030-06-15T19:17:47.500")");
+    check_type(context, 0, "block_timestamp_type", R"("2030-06-15T19:17:48.000")");
     check_error(context, "expected string containing block_timestamp_type",
                 [&] { return abieos_json_to_bin(context, 0, "block_timestamp_type", "true"); });
     check_type(context, 0, "name", R"("")");
