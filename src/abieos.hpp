@@ -27,6 +27,7 @@
 #pragma clang diagnostic ignored "-W#warnings"
 #endif
 
+#include <charconv>
 #include <ctime>
 #include <map>
 #include <optional>
@@ -64,6 +65,7 @@ struct pseudo_object;
 struct pseudo_array;
 struct pseudo_fixed_array;
 struct pseudo_variant;
+struct pseudo_enum;
 
 // !!!
 template <typename SrcIt, typename DestIt>
@@ -348,6 +350,12 @@ void bin_to_json(pseudo_array*, bin_to_json_state& state, bool allow_extensions,
 void bin_to_json(pseudo_fixed_array*, bin_to_json_state& state, bool allow_extensions, const abi_type* type,
                                 bool start);
 void bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_extensions,
+                                const abi_type* type, bool start);
+void json_to_bin(pseudo_enum*, jvalue_to_bin_state& state, bool allow_extensions,
+                                const abi_type* type, bool start);
+void json_to_bin(pseudo_enum*, json_to_bin_state& state, bool allow_extensions,
+                                const abi_type* type, bool start);
+void bin_to_json(pseudo_enum*, bin_to_json_state& state, bool allow_extensions,
                                 const abi_type* type, bool start);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -753,6 +761,52 @@ inline void json_to_bin(pseudo_variant*, jvalue_to_bin_state& state, bool allow_
     }
 }
 
+inline int64_t enum_parse_value(const abi_type::enum_& e, std::string_view sv) {
+    for (auto& [name, v] : e.values) {
+        if (name == sv)
+            return v;
+    }
+    // Fallback: parse as integer literal
+    int64_t val = 0;
+    auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), val);
+    sysio::check(ec == std::errc{}, "Unknown enum value: " + std::string(sv));
+    return val;
+}
+
+inline void enum_write_int(sysio::vector_stream& out, const std::string& type_name, int64_t val) {
+    using sysio::to_bin;
+    if (type_name == "uint8")  { to_bin((uint8_t)val, out);  return; }
+    if (type_name == "int8")   { to_bin((int8_t)val, out);   return; }
+    if (type_name == "uint16") { to_bin((uint16_t)val, out); return; }
+    if (type_name == "int16")  { to_bin((int16_t)val, out);  return; }
+    if (type_name == "uint32") { to_bin((uint32_t)val, out); return; }
+    if (type_name == "int32")  { to_bin((int32_t)val, out);  return; }
+    if (type_name == "uint64") { to_bin((uint64_t)val, out); return; }
+    if (type_name == "int64")  { to_bin((int64_t)val, out);  return; }
+    sysio::check(false, "Unsupported enum underlying type");
+}
+
+inline int64_t enum_read_int(sysio::input_stream& bin, const std::string& type_name) {
+    using sysio::from_bin;
+    if (type_name == "uint8")  { uint8_t v;  from_bin(v, bin); return v; }
+    if (type_name == "int8")   { int8_t v;   from_bin(v, bin); return v; }
+    if (type_name == "uint16") { uint16_t v; from_bin(v, bin); return v; }
+    if (type_name == "int16")  { int16_t v;  from_bin(v, bin); return v; }
+    if (type_name == "uint32") { uint32_t v; from_bin(v, bin); return v; }
+    if (type_name == "int32")  { int32_t v;  from_bin(v, bin); return v; }
+    if (type_name == "uint64") { uint64_t v; from_bin(v, bin); return (int64_t)v; }
+    if (type_name == "int64")  { int64_t v;  from_bin(v, bin); return v; }
+    sysio::check(false, "Unsupported enum underlying type"); return 0;
+}
+
+inline void json_to_bin(pseudo_enum*, jvalue_to_bin_state& state, bool,
+                        const abi_type* type, bool) {
+    auto& e = std::get<abi_type::enum_>(type->_data);
+    auto& sv = std::get<std::string>(state.received_value->value);
+    int64_t val = enum_parse_value(e, sv);
+    enum_write_int(state.writer, e.underlying_type->name, val);
+}
+
 template <typename T, typename State>
 void json_to_bin(T*, State& state, bool, const abi_type*, bool start) {
     using sysio::from_json;
@@ -940,6 +994,14 @@ inline void json_to_bin(pseudo_variant*, json_to_bin_state& state, bool allow_ex
     }
 }
 
+inline void json_to_bin(pseudo_enum*, json_to_bin_state& state, bool,
+                        const abi_type* type, bool) {
+    auto& e = std::get<abi_type::enum_>(type->_data);
+    auto sv = state.get_string(); // numbers also arrive as strings via kParseNumbersAsStringsFlag
+    int64_t val = enum_parse_value(e, sv);
+    enum_write_int(state.writer, e.underlying_type->name, val);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // bin_to_json
 ///////////////////////////////////////////////////////////////////////////////
@@ -1085,6 +1147,22 @@ inline void bin_to_json(pseudo_variant*, bin_to_json_state& state, bool allow_ex
         state.stack.pop_back();
         state.writer.write(']');
     }
+}
+
+inline void bin_to_json(pseudo_enum*, bin_to_json_state& state, bool,
+                        const abi_type* type, bool) {
+    auto& e = std::get<abi_type::enum_>(type->_data);
+    int64_t val = enum_read_int(state.bin, e.underlying_type->name);
+    for (auto& [name, v] : e.values) {
+        if (v == val) {
+            to_json(name, state.writer);
+            return;
+        }
+    }
+    // Fallback: output unknown value as quoted string number.
+    // Note: wire-sysio's abi_serializer outputs raw integer here instead.
+    auto s = std::to_string(val);
+    to_json(s, state.writer);
 }
 
 template <typename T>

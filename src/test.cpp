@@ -160,6 +160,32 @@ const char testAbi[] = R"({
     ]
 })";
 
+const char testEnumAbi[] = R"({
+    "version": "sysio::abi/1.1",
+    "structs": [
+        {
+            "name": "addtrxp",
+            "fields": [
+                {"name": "receiver", "type": "name"},
+                {"name": "action_name", "type": "name"},
+                {"name": "match_type", "type": "trx_match_type"},
+                {"name": "priority", "type": "int16"}
+            ]
+        }
+    ],
+    "enums": [
+        {
+            "name": "trx_match_type",
+            "type": "uint8",
+            "values": [
+                {"name": "only", "value": 0},
+                {"name": "first", "value": 1},
+                {"name": "any", "value": 2}
+            ]
+        }
+    ]
+})";
+
 const char transactionAbi[] = R"({
     "version": "sysio::abi/1.0",
     "types": [
@@ -614,6 +640,8 @@ void check_types() {
     check_context(context, abieos_set_abi(context, testAbiName, testAbi));
     check_context(context, abieos_set_abi_hex(context, testHexAbiName, testHexAbi));
     check_context(context, abieos_set_abi(context, testKvAbiName, testKvTablesAbi));
+    auto testEnumAbiName = check_context(context, abieos_string_to_name(context, "test.enum"));
+    check_context(context, abieos_set_abi(context, testEnumAbiName, testEnumAbi));
 
     int next_id = 0;
     auto write_corpus = [&](bool abi_is_bin, uint8_t operation, uint64_t contract, sysio::input_stream abi,
@@ -667,6 +695,9 @@ void check_types() {
             std::string error;
             if (!abieos::unhex(error, testHexAbi, testHexAbi + strlen(testHexAbi), std::back_inserter(abi)))
                 throw std::runtime_error(error);
+        } else if (contract == testEnumAbiName) {
+            abi_is_bin = false;
+            abi = {testEnumAbi, testEnumAbi + strlen(testEnumAbi)};
         } else {
             throw std::runtime_error("missing case in check_type");
         }
@@ -1280,6 +1311,24 @@ void check_types() {
 
     testWith(testAbiName);
     testWith(testHexAbiName);
+
+    // Enum type roundtrip: name string -> bin -> name string
+    check_type(context, testEnumAbiName, "trx_match_type", R"("only")");
+    check_type(context, testEnumAbiName, "trx_match_type", R"("first")");
+    check_type(context, testEnumAbiName, "trx_match_type", R"("any")");
+
+    // Enum in struct roundtrip
+    check_type(context, testEnumAbiName, "addtrxp",
+        R"({"receiver":"sysio","action_name":"transfer","match_type":"only","priority":10})");
+    check_type(context, testEnumAbiName, "addtrxp",
+        R"({"receiver":"sysio","action_name":"transfer","match_type":"any","priority":5})");
+
+    // Integer input accepted, outputs as name
+    check_type(context, testEnumAbiName, "trx_match_type", R"("0")", R"("only")");
+    check_type(context, testEnumAbiName, "trx_match_type", R"("1")", R"("first")");
+
+    // Unknown integer value falls back to string number
+    check_type(context, testEnumAbiName, "trx_match_type", R"("99")", R"("99")");
 
     auto check_checksum_capacity = [&](const auto& checksum, size_t capacity, const char* msg) {
         if(checksum.capacity() != capacity)
