@@ -6,6 +6,7 @@
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+#include <cinttypes>
 #include <stdexcept>
 #include <stdio.h>
 #include <string>
@@ -1320,6 +1321,123 @@ void check_types() {
     check_type(context, 0, "bitset", R"("110001011011000110101011101001100110000110")");
     check_type(context, 0, "bitset", R"("110001011011000110101011101001100110000110000000000000000001")");
     check_type(context, 0, "bitset", R"("110001011011000110101011101001100110000111111111111111111110")");
+
+    // ----------------------------------------------------------------------
+    // abieos_be_key_hex_to_json — covers every type produced by CDT's
+    // be_key_stream encoder in libraries/sysiolib/contracts/sysio/kv_utils.hpp.
+    // ----------------------------------------------------------------------
+
+    auto check_be_key = [&](const char* names_json, const char* types_json,
+                            const char* hex, const char* expected) {
+        const char* result = abieos_be_key_hex_to_json(context, names_json, types_json, hex);
+        if (!result)
+            throw std::runtime_error(std::string{"abieos_be_key_hex_to_json failed: "} +
+                                     abieos_get_error(context));
+        if (std::string{result} != expected) {
+            throw std::runtime_error(std::string{"be_key decode mismatch:\n  expected: "} +
+                                     expected + "\n  got:      " + result);
+        }
+    };
+
+    auto check_be_key_error = [&](const char* names_json, const char* types_json,
+                                  const char* hex, const char* expected_substr) {
+        const char* result = abieos_be_key_hex_to_json(context, names_json, types_json, hex);
+        if (result)
+            throw std::runtime_error("be_key decode unexpectedly succeeded");
+        std::string err{abieos_get_error(context)};
+        if (err.find(expected_substr) == std::string::npos) {
+            throw std::runtime_error(std::string{"be_key error mismatch:\n  expected substr: "} +
+                                     expected_substr + "\n  got: " + err);
+        }
+    };
+
+    // uint8 / int8 — sign bit flipped on signed
+    check_be_key(R"(["v"])", R"(["uint8"])",  "00",     R"({"v":0})");
+    check_be_key(R"(["v"])", R"(["uint8"])",  "ff",     R"({"v":255})");
+    check_be_key(R"(["v"])", R"(["int8"])",   "80",     R"({"v":0})");      // (0 ^ 0x80) → 0x80
+    check_be_key(R"(["v"])", R"(["int8"])",   "00",     R"({"v":-128})");   // (0x80 ^ 0x80) → 0
+    check_be_key(R"(["v"])", R"(["int8"])",   "ff",     R"({"v":127})");    // (-1 ^ 0x80) → 0x7F → -1?  (-1 → 0xFF ^ 0x80 = 0x7F = 127)
+
+    // uint16 / int16
+    check_be_key(R"(["v"])", R"(["uint16"])", "1234",   R"({"v":4660})");
+    check_be_key(R"(["v"])", R"(["int16"])",  "8000",   R"({"v":0})");
+    check_be_key(R"(["v"])", R"(["int16"])",  "ffff",   R"({"v":32767})");
+    check_be_key(R"(["v"])", R"(["int16"])",  "0000",   R"({"v":-32768})");
+
+    // uint32 / int32
+    check_be_key(R"(["v"])", R"(["uint32"])", "deadbeef", R"({"v":3735928559})");
+    check_be_key(R"(["v"])", R"(["int32"])",  "80000000", R"({"v":0})");
+    check_be_key(R"(["v"])", R"(["int32"])",  "ffffffff", R"({"v":2147483647})");
+    check_be_key(R"(["v"])", R"(["int32"])",  "00000000", R"({"v":-2147483648})");
+
+    // uint64 / int64 — emitted as JSON strings (matches abieos convention)
+    check_be_key(R"(["v"])", R"(["uint64"])", "0000000000000064", R"({"v":"100"})");
+    check_be_key(R"(["v"])", R"(["int64"])",  "8000000000000064", R"({"v":"100"})");
+
+    // uint128 / int128 — hex-formatted
+    check_be_key(R"(["v"])", R"(["uint128"])",
+                 "00112233445566778899aabbccddeeff",
+                 R"({"v":"0x00112233445566778899aabbccddeeff"})");
+    check_be_key(R"(["v"])", R"(["int128"])",
+                 "80000000000000000000000000000000",
+                 R"({"v":"0x00000000000000000000000000000000"})");
+
+    // name (e.g. "alice" → BE 0x0000003c178a8c00)
+    // Just round-trip through abieos_string_to_name to compute the bytes.
+    {
+        uint64_t alice_raw = abieos_string_to_name(context, "alice");
+        char alice_hex[17];
+        std::snprintf(alice_hex, sizeof(alice_hex), "%016" PRIx64, alice_raw);
+        std::string names = R"(["scope"])";
+        std::string types = R"(["name"])";
+        std::string expected = R"({"scope":"alice"})";
+        check_be_key(names.c_str(), types.c_str(), alice_hex, expected.c_str());
+    }
+
+    // bool
+    check_be_key(R"(["v"])", R"(["bool"])", "00", R"({"v":false})");
+    check_be_key(R"(["v"])", R"(["bool"])", "01", R"({"v":true})");
+
+    // checksum160 / checksum256 / checksum512 — raw bytes, hex-emitted
+    check_be_key(R"(["h"])", R"(["checksum160"])",
+                 "0102030405060708090a0b0c0d0e0f1011121314",
+                 R"({"h":"0102030405060708090a0b0c0d0e0f1011121314"})");
+    check_be_key(R"(["h"])", R"(["checksum256"])",
+                 "0000000000000000000000000000000000000000000000000000000000000001",
+                 R"({"h":"0000000000000000000000000000000000000000000000000000000000000001"})");
+
+    // string — NUL-escaped, terminated by 0x00 0x00. "hi" → 68 69 00 00
+    check_be_key(R"(["s"])", R"(["string"])", "68690000", R"({"s":"hi"})");
+    // string with embedded NUL: "a\0b" → 61 00 01 62 00 00 (6 bytes)
+    check_be_key(R"(["s"])", R"(["string"])", "610001620000", R"({"s":"a\u0000b"})");
+    // empty string: 00 00
+    check_be_key(R"(["s"])", R"(["string"])", "0000", R"({"s":""})");
+
+    // composite key: scope (name) + sym_code (uint64) — sysio.token's accounts table layout
+    {
+        uint64_t alice_raw = abieos_string_to_name(context, "alice");
+        char hex[34];
+        std::snprintf(hex, sizeof(hex), "%016" PRIx64 "%016" PRIx64,
+                      alice_raw, static_cast<uint64_t>(1397703940)); // "SYS" symbol code
+        check_be_key(R"(["scope","sym_code"])", R"(["name","uint64"])", hex,
+                     R"({"scope":"alice","sym_code":"1397703940"})");
+    }
+
+    // Error: trailing bytes
+    check_be_key_error(R"(["v"])", R"(["uint8"])", "0001", "trailing byte");
+
+    // Error: truncated input
+    check_be_key_error(R"(["v"])", R"(["uint64"])", "00", "unexpected end of data");
+
+    // Error: unknown type
+    check_be_key_error(R"(["v"])", R"(["frobnicator"])", "00",
+                       "unsupported type \"frobnicator\"");
+
+    // Error: mismatched lengths
+    check_be_key_error(R"(["a","b"])", R"(["uint8"])", "00", "same length");
+
+    // Error: empty arrays
+    check_be_key_error("[]", "[]", "", "empty");
 
     abieos_destroy(context);
 }
