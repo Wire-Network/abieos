@@ -50,7 +50,12 @@ const char* abieos_get_type_for_action(abieos_context* context, uint64_t contrac
 
 // Get the type name for a table. The context owns the returned memory. Returns null on error; use abieos_get_error
 // to retrieve error.
-const char* abieos_get_type_for_table(abieos_context* context, uint64_t contract, uint64_t table);
+//
+// `table` is a free-form string. Wire-sysio PR #288 (Wire-Network/wire-sysio#288)
+// widened table_def.name to a string so long table names work end-to-end; this
+// entry point used to take a uint64-encoded sysio::name. Callers that still hold
+// a uint64 name should decode it via abieos_name_to_string() before calling.
+const char* abieos_get_type_for_table(abieos_context* context, uint64_t contract, const char* table);
 
 // Get the type name for an action_result. The context owns the returned memory. Returns null on error; use
 // abieos_get_error to retrieve error.

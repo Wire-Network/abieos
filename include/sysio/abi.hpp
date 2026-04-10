@@ -106,15 +106,32 @@ struct action_def {
 
 SYSIO_REFLECT(action_def, name, type, ricardian_contract);
 
+// Per-secondary-index metadata embedded in table_def. Mirrors
+// sysio::chain::index_def in wire-sysio's libraries/chain/include/sysio/chain/abi_def.hpp.
+struct index_def {
+   std::string name{};      // e.g. "byowner", "bybalance"
+   std::string key_type{};  // e.g. "uint64", "name", "checksum256"
+   uint16_t    table_id{};  // unique table_id for this secondary index
+};
+
+SYSIO_REFLECT(index_def, name, key_type, table_id);
+
+// Wire-sysio PR Wire-Network/wire-sysio#288 changed `name` from sysio::name (uint64)
+// to free-form std::string so long table names work, and added `table_id` (uint16,
+// DJB2 hash of the table name % 65536) and `secondary_indexes` for KV table indexing.
+// The binary wire format break means this struct must be updated in lockstep with
+// the chain side or every field after `tables` in abi_def parses misaligned.
 struct table_def {
-   sysio::name              name{};
+   std::string              name{};
    std::string              index_type{};
    std::vector<std::string> key_names{};
    std::vector<std::string> key_types{};
    std::string              type{};
+   uint16_t                 table_id{};
+   std::vector<index_def>   secondary_indexes{};
 };
 
-SYSIO_REFLECT(table_def, name, index_type, key_names, key_types, type);
+SYSIO_REFLECT(table_def, name, index_type, key_names, key_types, type, table_id, secondary_indexes);
 
 struct clause_pair {
    std::string id{};
@@ -184,10 +201,14 @@ struct abi_def {
    might_not_exist<std::vector<variant_def>>                  variants{};
    might_not_exist<std::vector<action_result_def>>            action_results{};
    might_not_exist<std::vector<enum_def>>                     enums{};
+   // Forward-compat extension added by wire-sysio for protobuf schema embedding.
+   // Not consumed by abieos itself, but the field must be reflected so that the
+   // binary deserializer correctly traverses past it to the end of the buffer.
+   might_not_exist<std::string>                               protobuf_types{};
 };
 
 SYSIO_REFLECT(abi_def, version, types, structs, actions, tables, ricardian_clauses, error_messages, abi_extensions,
-              variants, action_results, enums);
+              variants, action_results, enums, protobuf_types);
 
 struct abi_type;
 
@@ -279,10 +300,19 @@ struct abi_type {
          std::string_view json, std::function<void()> f = [] {}) const;
 };
 
+// String-keyed map aliases. std::less<> as the comparator enables transparent
+// lookup so callers can pass std::string_view (or const char*) without
+// allocating a temporary std::string for every find().
+using table_type_map = std::map<std::string, std::string, std::less<>>;
+using abi_type_map   = std::map<std::string, abi_type, std::less<>>;
+
 struct abi {
    std::map<sysio::name, std::string> action_types;
-   std::map<sysio::name, std::string> table_types;
-   std::map<std::string, abi_type>    abi_types;
+   // table_types is keyed by free-form table name string (was sysio::name
+   // uint64) so long table names are supported end-to-end. Wire-sysio PR #288
+   // widened table_def.name to std::string for this reason.
+   table_type_map                     table_types;
+   abi_type_map                       abi_types;
    std::map<sysio::name, std::string> action_result_types;
    const abi_type*                    get_type(const std::string& name);
 
@@ -428,6 +458,7 @@ void to_json(const abi_def& def, S& stream) {
    to_json_write_helper(def.variants.value, "variants", true, stream);
    to_json_write_helper(def.action_results.value, "action_results", true, stream);
    to_json_write_helper(def.enums.value, "enums", true, stream);
+   to_json_write_helper(def.protobuf_types.value, "protobuf_types", true, stream);
    stream.write('}');
 }
 } // namespace sysio

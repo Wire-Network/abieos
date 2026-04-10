@@ -158,17 +158,21 @@ extern "C" const char* abieos_get_type_for_action(abieos_context* context, uint6
     });
 }
 
-extern "C" const char* abieos_get_type_for_table(abieos_context* context, uint64_t contract, uint64_t table) {
+extern "C" const char* abieos_get_type_for_table(abieos_context* context, uint64_t contract, const char* table) {
     return handle_exceptions(context, nullptr, [&] {
+        if (!table)
+            throw std::runtime_error("table name is null");
         auto contract_it = context->contracts.find(::abieos::name{contract});
         if (contract_it == context->contracts.end())
             throw std::runtime_error("contract \"" + sysio::name_to_string(contract) + "\" is not loaded");
         auto& c = contract_it->second;
 
-        auto table_it = c.table_types.find(name{table});
+        // std::less<> on table_types enables transparent string_view lookup,
+        // so the const char* doesn't need a temporary std::string.
+        auto table_it = c.table_types.find(std::string_view{table});
         if (table_it == c.table_types.end())
             throw std::runtime_error("contract \"" + sysio::name_to_string(contract) + "\" does not have table \"" +
-                                     sysio::name_to_string(table) + "\"");
+                                     std::string{table} + "\"");
         return table_it->second.c_str();
     });
 }
