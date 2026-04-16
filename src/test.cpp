@@ -1394,6 +1394,31 @@ void check_types() {
         check_be_key(names.c_str(), types.c_str(), alice_hex, expected.c_str());
     }
 
+    // float32 — encoder XORs sign bit on positives, bitwise-NOTs negatives,
+    // so +0.0 and -0.0 encode to different bytes and decode back distinctly.
+    // +0.0: 0x00000000 XOR 0x80000000 → 0x80000000
+    check_be_key(R"(["v"])", R"(["float32"])", "80000000", R"({"v":0.000000})");
+    // -0.0: 0x80000000 NOT → 0x7fffffff (the branch boundary — distinct from +0.0)
+    check_be_key(R"(["v"])", R"(["float32"])", "7fffffff", R"({"v":-0.000000})");
+    // +1.5: 0x3fc00000 XOR 0x80000000 → 0xbfc00000
+    check_be_key(R"(["v"])", R"(["float32"])", "bfc00000", R"({"v":1.500000})");
+    // -1.5: 0xbfc00000 NOT → 0x403fffff
+    check_be_key(R"(["v"])", R"(["float32"])", "403fffff", R"({"v":-1.500000})");
+    // "float" alias resolves the same way as float32.
+    check_be_key(R"(["v"])", R"(["float"])", "bfc00000", R"({"v":1.500000})");
+
+    // float64 — same scheme with 1<<63 instead of 1<<31.
+    // +0.0 → XOR 1<<63 → 0x8000000000000000
+    check_be_key(R"(["v"])", R"(["float64"])", "8000000000000000", R"({"v":0.000000})");
+    // -0.0 → NOT → 0x7fffffffffffffff
+    check_be_key(R"(["v"])", R"(["float64"])", "7fffffffffffffff", R"({"v":-0.000000})");
+    // +2.5: 0x4004000000000000 XOR 1<<63 → 0xc004000000000000
+    check_be_key(R"(["v"])", R"(["float64"])", "c004000000000000", R"({"v":2.500000})");
+    // -2.5: 0xc004000000000000 NOT → 0x3ffbffffffffffff
+    check_be_key(R"(["v"])", R"(["float64"])", "3ffbffffffffffff", R"({"v":-2.500000})");
+    // "double" alias resolves the same way as float64.
+    check_be_key(R"(["v"])", R"(["double"])", "c004000000000000", R"({"v":2.500000})");
+
     // bool
     check_be_key(R"(["v"])", R"(["bool"])", "00", R"({"v":false})");
     check_be_key(R"(["v"])", R"(["bool"])", "01", R"({"v":true})");
@@ -1413,21 +1438,27 @@ void check_types() {
     // empty string: 00 00
     check_be_key(R"(["s"])", R"(["string"])", "0000", R"({"s":""})");
 
-    // composite key: scope (name) + sym_code (uint64) — sysio.token's accounts table layout
+    // composite key: scope (name) + sym_code (uint64) — sysio.token's accounts table layout.
+    // symbol_code("SYS") packs as uint64 LE ASCII = 'S'|('Y'<<8)|('S'<<16) = 0x535953 = 5462355.
     {
         uint64_t alice_raw = abieos_string_to_name(context, "alice");
+        constexpr uint64_t sys_code = uint64_t('S') | (uint64_t('Y') << 8) | (uint64_t('S') << 16);
         char hex[34];
-        std::snprintf(hex, sizeof(hex), "%016" PRIx64 "%016" PRIx64,
-                      alice_raw, static_cast<uint64_t>(1397703940)); // "SYS" symbol code
+        std::snprintf(hex, sizeof(hex), "%016" PRIx64 "%016" PRIx64, alice_raw, sys_code);
         check_be_key(R"(["scope","sym_code"])", R"(["name","uint64"])", hex,
-                     R"({"scope":"alice","sym_code":"1397703940"})");
+                     R"({"scope":"alice","sym_code":"5462355"})");
     }
 
     // Error: trailing bytes
     check_be_key_error(R"(["v"])", R"(["uint8"])", "0001", "trailing byte");
 
-    // Error: truncated input
-    check_be_key_error(R"(["v"])", R"(["uint64"])", "00", "unexpected end of data");
+    // Error: truncated input — error message names the caller's declared
+    // field type ("name"/"checksum256") rather than the internal read width.
+    check_be_key_error(R"(["v"])", R"(["uint64"])", "00", "reading uint64");
+    check_be_key_error(R"(["v"])", R"(["name"])", "00", "reading name");
+    check_be_key_error(R"(["v"])", R"(["int64"])", "00", "reading int64");
+    check_be_key_error(R"(["v"])", R"(["float64"])", "00", "reading float64");
+    check_be_key_error(R"(["v"])", R"(["checksum256"])", "00", "reading checksum256");
 
     // Error: unknown type
     check_be_key_error(R"(["v"])", R"(["frobnicator"])", "00",
