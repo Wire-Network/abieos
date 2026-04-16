@@ -107,20 +107,25 @@ struct action_def {
 SYSIO_REFLECT(action_def, name, type, ricardian_contract);
 
 // Per-secondary-index metadata embedded in table_def. Mirrors
-// sysio::chain::index_def in wire-sysio's libraries/chain/include/sysio/chain/abi_def.hpp.
+// sysio::chain::index_def.
 struct index_def {
    std::string name{};      // e.g. "byowner", "bybalance"
    std::string key_type{};  // e.g. "uint64", "name", "checksum256"
-   uint16_t    table_id{};  // unique table_id for this secondary index
+   // Chain-assigned uint16 id used for KV namespace isolation. The domain is
+   // only 65 536 slots, so table_id is *not* a unique key on its own --
+   // abieos treats it as opaque chain state. Uniqueness within a contract is
+   // guaranteed chain-side; see sysio::chain::abi_def for the assignment rules.
+   uint16_t    table_id{};
 };
 
 SYSIO_REFLECT(index_def, name, key_type, table_id);
 
-// Wire-sysio PR Wire-Network/wire-sysio#288 changed `name` from sysio::name (uint64)
-// to free-form std::string so long table names work, and added `table_id` (uint16,
-// DJB2 hash of the table name % 65536) and `secondary_indexes` for KV table indexing.
-// The binary wire format break means this struct must be updated in lockstep with
-// the chain side or every field after `tables` in abi_def parses misaligned.
+// Mirrors sysio::chain::table_def. `name` is a free-form std::string (not a
+// sysio::name) so long table names are representable. `table_id` is a
+// chain-assigned uint16 id used for KV table namespace isolation; uniqueness
+// is guaranteed by the chain, not by abieos. The binary layout must track the
+// chain-side definition exactly or every field after `tables` in abi_def
+// parses misaligned.
 struct table_def {
    std::string              name{};
    std::string              index_type{};
@@ -307,10 +312,12 @@ using table_type_map = std::map<std::string, std::string, std::less<>>;
 using abi_type_map   = std::map<std::string, abi_type, std::less<>>;
 
 struct abi {
+   // action_types (and action_result_types) stay keyed on sysio::name: action
+   // names and action-result names are always 12-char sysio names (short
+   // names fit in a uint64 without collision), so widening the key type would
+   // buy nothing. table_types is keyed on std::string so long, free-form
+   // table names round-trip through abi_def without loss.
    std::map<sysio::name, std::string> action_types;
-   // table_types is keyed by free-form table name string (was sysio::name
-   // uint64) so long table names are supported end-to-end. Wire-sysio PR #288
-   // widened table_def.name to std::string for this reason.
    table_type_map                     table_types;
    abi_type_map                       abi_types;
    std::map<sysio::name, std::string> action_result_types;
@@ -458,7 +465,12 @@ void to_json(const abi_def& def, S& stream) {
    to_json_write_helper(def.variants.value, "variants", true, stream);
    to_json_write_helper(def.action_results.value, "action_results", true, stream);
    to_json_write_helper(def.enums.value, "enums", true, stream);
-   to_json_write_helper(def.protobuf_types.value, "protobuf_types", true, stream);
+   // Only emit protobuf_types when it has content. The surrounding vector
+   // extensions always emit (empty -> "[]") because a missing array versus an
+   // empty array is harmless, but "protobuf_types":"" would wrongly signal a
+   // schema is attached to consumers that test presence by key lookup.
+   if (!def.protobuf_types.value.empty())
+      to_json_write_helper(def.protobuf_types.value, "protobuf_types", true, stream);
    stream.write('}');
 }
 } // namespace sysio

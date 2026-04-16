@@ -201,6 +201,12 @@ void sysio::convert(const abi_def& abi, sysio::abi& c) {
     for (auto& a : abi.actions)
         c.action_types[a.name] = a.type;
     for (auto& t : abi.tables)
+        // Only the primary table_def.type is indexed here. table_def.table_id
+        // and table_def.secondary_indexes are intentionally not consumed:
+        // abieos resolves row data through the primary type alone, and the
+        // secondary index metadata is chain-side state used by nodeop's
+        // table_id namespace isolation. Keep the fields in abi_def so binary
+        // round-trips are faithful, but no serializer is attached here.
         c.table_types[t.name] = t.type;
     for (auto& r : abi.action_results.value)
         c.action_result_types[r.name] = r.result_type;
