@@ -1482,7 +1482,6 @@ void check_protobuf_types_round_trip() {
     // emit it in JSON. Without content: abieos must omit the field from JSON
     // so consumers can distinguish "schema present" from "field absent".
     auto context = check(abieos_create());
-    auto contract = check_context(context, abieos_string_to_name(context, "pb.c"));
 
     const char with_pb[] = R"({"version":"sysio::abi/1.2","types":[],"structs":[],"actions":[],"tables":[],"ricardian_clauses":[],"error_messages":[],"variants":[],"action_results":[],"enums":[],"protobuf_types":"syntax=proto3; message M { int32 v=1; }"})";
     check_context(context, abieos_abi_json_to_bin(context, with_pb));
@@ -1500,15 +1499,20 @@ void check_protobuf_types_round_trip() {
 
     // Absence case: explicit empty string and a fully omitted field both must
     // round-trip to JSON that omits the key entirely.
-    check_context(context, abieos_set_abi(context, contract, R"({"version":"sysio::abi/1.2"})"));
-    check_context(context, abieos_abi_json_to_bin(context, R"({"version":"sysio::abi/1.2","protobuf_types":""})"));
-    const char* empty_hex = check_context(context, abieos_get_bin_hex(context));
-    std::vector<char> empty_bin;
-    if (!abieos::unhex(unhex_err, empty_hex, empty_hex + strlen(empty_hex), std::back_inserter(empty_bin)))
-        throw std::runtime_error(unhex_err);
-    const char* j_empty = check_context(context, abieos_abi_bin_to_json(context, empty_bin.data(), empty_bin.size()));
-    if (std::string{j_empty}.find("protobuf_types") != std::string::npos)
-        throw std::runtime_error("protobuf_types emitted despite being empty");
+    const char* absent_inputs[] = {
+        R"({"version":"sysio::abi/1.2","protobuf_types":""})", // explicit empty
+        R"({"version":"sysio::abi/1.2"})",                     // fully omitted
+    };
+    for (const char* in : absent_inputs) {
+        check_context(context, abieos_abi_json_to_bin(context, in));
+        const char* empty_hex = check_context(context, abieos_get_bin_hex(context));
+        std::vector<char> empty_bin;
+        if (!abieos::unhex(unhex_err, empty_hex, empty_hex + strlen(empty_hex), std::back_inserter(empty_bin)))
+            throw std::runtime_error(unhex_err);
+        const char* j_empty = check_context(context, abieos_abi_bin_to_json(context, empty_bin.data(), empty_bin.size()));
+        if (std::string{j_empty}.find("protobuf_types") != std::string::npos)
+            throw std::runtime_error("protobuf_types emitted despite being empty/absent");
+    }
     abieos_destroy(context);
 }
 
