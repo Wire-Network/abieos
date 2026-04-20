@@ -3,7 +3,11 @@
 #include "abieos.h"
 #include "abieos.hpp"
 
+#include <cinttypes>
+#include <cstdio>
+#include <cstring>
 #include <memory>
+#include <string_view>
 
 using namespace abieos;
 
@@ -294,6 +298,275 @@ extern "C" const char* abieos_abi_bin_to_json(abieos_context* context, const cha
         to_json(def, byte_stream);
 
         context->result_str.assign(bytes.begin(), bytes.end());
+        return context->result_str.c_str();
+    });
+}
+
+// --- Big-endian KV key decoder ---
+//
+// Decodes keys produced by CDT's `sysio::kv::be_key_stream` (see
+// libraries/sysiolib/contracts/sysio/kv_utils.hpp in wire-cdt). The encoding
+// is designed so a lexicographic memcmp on the encoded bytes matches the
+// natural ordering of the underlying values, which means the encoder applies
+// sign-flips to signed integers and to floats:
+//
+//   uint8/16/32/64    big-endian raw
+//   int8/16/32/64     big-endian XOR 1<<(N-1)  (flip sign bit so negatives sort first)
+//   uint128/int128    big-endian (high uint64 then low uint64); int128 XOR 1<<127
+//   name              big-endian raw uint64
+//   bool              1 byte
+//   float (32-bit)    big-endian, positive values XOR 1<<31, negative values bitwise NOT
+//   double (64-bit)   big-endian, positive values XOR 1<<63, negative values bitwise NOT
+//   string / bytes    NUL-escaped: each 0x00 in the payload is rewritten as 0x00 0x01,
+//                     terminated by a 0x00 0x00 sentinel
+//   checksum160       20 raw bytes (no transform)
+//   checksum256       32 raw bytes
+//   checksum512       64 raw bytes
+//
+// `checksum*` types reach be_key_stream via a generic
+// `template<DataStream, size_t> operator<<(DataStream&, const fixed_bytes<Size>&)`
+// in core/sysio/fixed_bytes.hpp that just writes the raw bytes via
+// be_key_stream::write(const char*, size_t) — no sign flip, no length prefix.
+
+namespace {
+
+// Lowercase hex alphabet shared by read_raw_hex and the bytes-field branch.
+constexpr char be_key_hex_chars[] = "0123456789abcdef";
+
+[[noreturn]] void be_key_overrun(const char* type) {
+    throw std::runtime_error(std::string("be_key: unexpected end of data reading ") + type);
+}
+
+// Each read_be* takes a `type_label` naming the caller's declared field type
+// (e.g. "name", "int64", "float64") so truncation errors name the field the
+// caller asked for, not the internal width being read.
+uint8_t read_be8(const char*& pos, const char* end, const char* type_label) {
+    if (pos + 1 > end) be_key_overrun(type_label);
+    return static_cast<uint8_t>(*pos++);
+}
+
+uint16_t read_be16(const char*& pos, const char* end, const char* type_label) {
+    if (pos + 2 > end) be_key_overrun(type_label);
+    uint16_t v = 0;
+    for (int i = 0; i < 2; ++i) v = static_cast<uint16_t>((v << 8) | static_cast<uint8_t>(*pos++));
+    return v;
+}
+
+uint32_t read_be32(const char*& pos, const char* end, const char* type_label) {
+    if (pos + 4 > end) be_key_overrun(type_label);
+    uint32_t v = 0;
+    for (int i = 0; i < 4; ++i) v = (v << 8) | static_cast<uint8_t>(*pos++);
+    return v;
+}
+
+uint64_t read_be64(const char*& pos, const char* end, const char* type_label) {
+    if (pos + 8 > end) be_key_overrun(type_label);
+    uint64_t v = 0;
+    for (int i = 0; i < 8; ++i) v = (v << 8) | static_cast<uint8_t>(*pos++);
+    return v;
+}
+
+// Read N raw bytes and emit as a lowercase hex string (no 0x prefix), e.g.
+// for checksum160/256/512 fields. The CDT encoder writes these via
+// be_key_stream::write() with no transform, so the decoder mirrors that.
+std::string read_raw_hex(const char*& pos, const char* end, size_t n, const char* type) {
+    if (pos + n > end) be_key_overrun(type);
+    std::string out;
+    out.reserve(n * 2);
+    for (size_t i = 0; i < n; ++i) {
+        uint8_t b = static_cast<uint8_t>(*pos++);
+        out.push_back(be_key_hex_chars[b >> 4]);
+        out.push_back(be_key_hex_chars[b & 0x0F]);
+    }
+    return out;
+}
+
+// Decode a NUL-escaped string/bytes payload terminated by 0x00 0x00.
+// Each 0x00 0x01 in the stream represents an embedded NUL byte; a bare
+// 0x00 followed by 0x00 ends the field. Mirrors `write_escaped` in CDT's
+// be_key_stream.
+std::string read_nul_escaped(const char*& pos, const char* end) {
+    std::string out;
+    while (pos < end) {
+        char c = *pos++;
+        if (c != '\0') {
+            out.push_back(c);
+            continue;
+        }
+        if (pos >= end) be_key_overrun("string (truncated escape)");
+        char next = *pos++;
+        if (next == '\0') return out;            // 0x00 0x00 → end of field
+        if (next == '\x01') { out.push_back('\0'); continue; } // 0x00 0x01 → embedded NUL
+        be_key_overrun("string (bad escape)");
+    }
+    be_key_overrun("string (no terminator)");
+}
+
+// Append a JSON-escaped string literal (with surrounding quotes) to `out`.
+// Handles the escapes that string fields can legitimately contain after
+// NUL-unescaping (control chars, quotes, backslashes).
+void append_json_string(std::string& out, std::string_view s) {
+    out.push_back('"');
+    for (char c : s) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            case '\t': out += "\\t";  break;
+            case '\b': out += "\\b";  break;
+            case '\f': out += "\\f";  break;
+            default:
+                if (static_cast<uint8_t>(c) < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<uint8_t>(c));
+                    out += buf;
+                } else {
+                    out.push_back(c);
+                }
+        }
+    }
+    out.push_back('"');
+}
+
+void decode_be_field(const std::string& type, const char*& pos, const char* end, std::string& out) {
+    const char* tl = type.c_str();
+    if (type == "uint8") {
+        out += std::to_string(read_be8(pos, end, tl));
+    } else if (type == "int8") {
+        // be_key_stream: int8 → uint8 ^ 0x80
+        uint8_t raw = read_be8(pos, end, tl);
+        out += std::to_string(static_cast<int8_t>(raw ^ 0x80));
+    } else if (type == "uint16") {
+        out += std::to_string(read_be16(pos, end, tl));
+    } else if (type == "int16") {
+        uint16_t raw = read_be16(pos, end, tl);
+        out += std::to_string(static_cast<int16_t>(raw ^ 0x8000));
+    } else if (type == "uint32") {
+        out += std::to_string(read_be32(pos, end, tl));
+    } else if (type == "int32") {
+        uint32_t raw = read_be32(pos, end, tl);
+        out += std::to_string(static_cast<int32_t>(raw ^ 0x80000000u));
+    } else if (type == "uint64") {
+        // JSON numbers >2^53 are unsafe in JS — emit as a string for parity
+        // with the rest of abieos which serializes uint64 as a JSON string.
+        out += "\"" + std::to_string(read_be64(pos, end, tl)) + "\"";
+    } else if (type == "int64") {
+        uint64_t raw = read_be64(pos, end, tl);
+        int64_t signed_val = static_cast<int64_t>(raw ^ (uint64_t(1) << 63));
+        out += "\"" + std::to_string(signed_val) + "\"";
+    } else if (type == "uint128") {
+        uint64_t hi = read_be64(pos, end, tl);
+        uint64_t lo = read_be64(pos, end, tl);
+        char buf[40];
+        std::snprintf(buf, sizeof(buf), "\"0x%016" PRIx64 "%016" PRIx64 "\"", hi, lo);
+        out += buf;
+    } else if (type == "int128") {
+        // be_key_stream: int128 → (uint128) ^ (1 << 127)
+        uint64_t hi = read_be64(pos, end, tl);
+        uint64_t lo = read_be64(pos, end, tl);
+        hi ^= (uint64_t(1) << 63);
+        char buf[40];
+        std::snprintf(buf, sizeof(buf), "\"0x%016" PRIx64 "%016" PRIx64 "\"", hi, lo);
+        out += buf;
+    } else if (type == "name") {
+        out += "\"" + sysio::name_to_string(read_be64(pos, end, tl)) + "\"";
+    } else if (type == "float32" || type == "float") {
+        uint32_t bits = read_be32(pos, end, tl);
+        // Reverse encoder: positive had top bit flipped, negative had all bits flipped
+        if (bits >> 31) bits ^= (uint32_t(1) << 31);
+        else            bits = ~bits;
+        float v;
+        std::memcpy(&v, &bits, 4);
+        out += std::to_string(v);
+    } else if (type == "float64" || type == "double") {
+        uint64_t bits = read_be64(pos, end, tl);
+        if (bits >> 63) bits ^= (uint64_t(1) << 63);
+        else            bits = ~bits;
+        double v;
+        std::memcpy(&v, &bits, 8);
+        out += std::to_string(v);
+    } else if (type == "bool") {
+        out += (read_be8(pos, end, tl) ? "true" : "false");
+    } else if (type == "string") {
+        append_json_string(out, read_nul_escaped(pos, end));
+    } else if (type == "bytes") {
+        // bytes are encoded the same way as string (NUL-escaped). Emit as a
+        // hex string for parity with the rest of abieos which represents
+        // bytes fields as hex in JSON.
+        std::string raw = read_nul_escaped(pos, end);
+        out += "\"";
+        for (char c : raw) {
+            uint8_t b = static_cast<uint8_t>(c);
+            out.push_back(be_key_hex_chars[b >> 4]);
+            out.push_back(be_key_hex_chars[b & 0x0F]);
+        }
+        out += "\"";
+    } else if (type == "checksum160") {
+        out += "\"" + read_raw_hex(pos, end, 20, tl) + "\"";
+    } else if (type == "checksum256") {
+        out += "\"" + read_raw_hex(pos, end, 32, tl) + "\"";
+    } else if (type == "checksum512") {
+        out += "\"" + read_raw_hex(pos, end, 64, tl) + "\"";
+    } else {
+        throw std::runtime_error("be_key: unsupported type \"" + type + "\"");
+    }
+}
+
+// Parse a JSON string array using sysio's existing JSON parser instead of
+// hand-rolling. Throws on malformed input. Caller passes a mutable buffer.
+std::vector<std::string> parse_json_string_array(const char* json) {
+    if (!json) throw std::runtime_error("be_key: null JSON array");
+    std::string copy{json};
+    sysio::json_token_stream stream(copy.data());
+    std::vector<std::string> result;
+    sysio::from_json(result, stream);
+    return result;
+}
+
+} // anonymous namespace
+
+extern "C" const char* abieos_be_key_hex_to_json(abieos_context* context, const char* key_names_json,
+                                                   const char* key_types_json, const char* hex) {
+    fix_null_str(key_names_json);
+    fix_null_str(key_types_json);
+    fix_null_str(hex);
+    return handle_exceptions(context, nullptr, [&]() -> const char* {
+        auto names = parse_json_string_array(key_names_json);
+        auto types = parse_json_string_array(key_types_json);
+        if (names.size() != types.size())
+            throw std::runtime_error("be_key: key_names and key_types must have the same length");
+        if (names.empty())
+            throw std::runtime_error("be_key: key_names/key_types are empty");
+
+        std::vector<char> data;
+        std::string error;
+        if (!unhex(error, hex, hex + strlen(hex), std::back_inserter(data))) {
+            set_error(context, error.empty() ? "invalid hex" : std::move(error));
+            return nullptr;
+        }
+
+        const char* pos = data.data();
+        const char* end = pos + data.size();
+
+        std::string json = "{";
+        for (size_t i = 0; i < names.size(); ++i) {
+            if (i > 0) json += ",";
+            append_json_string(json, names[i]);
+            json += ":";
+            decode_be_field(types[i], pos, end, json);
+        }
+        json += "}";
+
+        if (pos != end) {
+            // Trailing bytes after all declared fields are decoded means the
+            // caller's key_types didn't match the encoded key. Surface that
+            // as an explicit error rather than silently dropping bytes.
+            throw std::runtime_error("be_key: " + std::to_string(end - pos) +
+                                     " trailing byte(s) after decoding declared fields");
+        }
+
+        context->result_str = std::move(json);
         return context->result_str.c_str();
     });
 }
