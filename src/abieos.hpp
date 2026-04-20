@@ -189,7 +189,8 @@ struct json_reader_handler : public rapidjson::BaseReaderHandler<rapidjson::UTF8
 
 struct jvalue;
 using jarray = std::vector<jvalue>;
-using jobject = std::map<std::string, jvalue>;
+// std::less<> as the comparator so string_view lookups don't allocate.
+using jobject = std::map<std::string, jvalue, std::less<>>;
 
 struct jvalue {
     std::variant<std::nullptr_t, bool, std::string, jobject, jarray> value;

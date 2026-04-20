@@ -1,7 +1,7 @@
 # copyright defined in abieos/LICENSE.md
 
 cmake_minimum_required (VERSION 3.16...4.0)
-project(abieos VERSION 0.1 LANGUAGES CXX C)
+project(abieos VERSION 0.2 LANGUAGES CXX C)
 
 set(default_build_type "Release")
 

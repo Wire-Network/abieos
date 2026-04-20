@@ -106,15 +106,37 @@ struct action_def {
 
 SYSIO_REFLECT(action_def, name, type, ricardian_contract);
 
+// Per-secondary-index metadata embedded in table_def. Mirrors
+// sysio::chain::index_def.
+struct index_def {
+   std::string name{};      // e.g. "byowner", "bybalance"
+   std::string key_type{};  // e.g. "uint64", "name", "checksum256"
+   // Chain-assigned uint16 id used for KV namespace isolation. The domain is
+   // only 65 536 slots, so table_id is *not* a unique key on its own --
+   // abieos treats it as opaque chain state. Uniqueness within a contract is
+   // guaranteed chain-side; see sysio::chain::abi_def for the assignment rules.
+   uint16_t    table_id{};
+};
+
+SYSIO_REFLECT(index_def, name, key_type, table_id);
+
+// Mirrors sysio::chain::table_def. `name` is a free-form std::string (not a
+// sysio::name) so long table names are representable. `table_id` is a
+// chain-assigned uint16 id used for KV table namespace isolation; uniqueness
+// is guaranteed by the chain, not by abieos. The binary layout must track the
+// chain-side definition exactly or every field after `tables` in abi_def
+// parses misaligned.
 struct table_def {
-   sysio::name              name{};
+   std::string              name{};
    std::string              index_type{};
    std::vector<std::string> key_names{};
    std::vector<std::string> key_types{};
    std::string              type{};
+   uint16_t                 table_id{};
+   std::vector<index_def>   secondary_indexes{};
 };
 
-SYSIO_REFLECT(table_def, name, index_type, key_names, key_types, type);
+SYSIO_REFLECT(table_def, name, index_type, key_names, key_types, type, table_id, secondary_indexes);
 
 struct clause_pair {
    std::string id{};
@@ -184,10 +206,14 @@ struct abi_def {
    might_not_exist<std::vector<variant_def>>                  variants{};
    might_not_exist<std::vector<action_result_def>>            action_results{};
    might_not_exist<std::vector<enum_def>>                     enums{};
+   // Forward-compat extension added by wire-sysio for protobuf schema embedding.
+   // Not consumed by abieos itself, but the field must be reflected so that the
+   // binary deserializer correctly traverses past it to the end of the buffer.
+   might_not_exist<std::string>                               protobuf_types{};
 };
 
 SYSIO_REFLECT(abi_def, version, types, structs, actions, tables, ricardian_clauses, error_messages, abi_extensions,
-              variants, action_results, enums);
+              variants, action_results, enums, protobuf_types);
 
 struct abi_type;
 
@@ -279,10 +305,21 @@ struct abi_type {
          std::string_view json, std::function<void()> f = [] {}) const;
 };
 
+// String-keyed map aliases. std::less<> as the comparator enables transparent
+// lookup so callers can pass std::string_view (or const char*) without
+// allocating a temporary std::string for every find().
+using table_type_map = std::map<std::string, std::string, std::less<>>;
+using abi_type_map   = std::map<std::string, abi_type, std::less<>>;
+
 struct abi {
+   // action_types (and action_result_types) stay keyed on sysio::name: action
+   // names and action-result names are always 12-char sysio names (short
+   // names fit in a uint64 without collision), so widening the key type would
+   // buy nothing. table_types is keyed on std::string so long, free-form
+   // table names round-trip through abi_def without loss.
    std::map<sysio::name, std::string> action_types;
-   std::map<sysio::name, std::string> table_types;
-   std::map<std::string, abi_type>    abi_types;
+   table_type_map                     table_types;
+   abi_type_map                       abi_types;
    std::map<sysio::name, std::string> action_result_types;
    const abi_type*                    get_type(const std::string& name);
 
@@ -428,6 +465,12 @@ void to_json(const abi_def& def, S& stream) {
    to_json_write_helper(def.variants.value, "variants", true, stream);
    to_json_write_helper(def.action_results.value, "action_results", true, stream);
    to_json_write_helper(def.enums.value, "enums", true, stream);
+   // Only emit protobuf_types when it has content. The surrounding vector
+   // extensions always emit (empty -> "[]") because a missing array versus an
+   // empty array is harmless, but "protobuf_types":"" would wrongly signal a
+   // schema is attached to consumers that test presence by key lookup.
+   if (!def.protobuf_types.value.empty())
+      to_json_write_helper(def.protobuf_types.value, "protobuf_types", true, stream);
    stream.write('}');
 }
 } // namespace sysio

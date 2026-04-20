@@ -30,7 +30,7 @@ struct abi_serializer_impl : abi_serializer {
 template <typename T>
 constexpr auto abi_serializer_for = abi_serializer_impl<T>{};
 
-abi_type::alias resolve(std::map<std::string, abi_type>& abi_types, const abi_type::alias_def* type, int depth);
+abi_type::alias resolve(abi_type_map& abi_types, const abi_type::alias_def* type, int depth);
 
 template<typename... T, typename... A>
 bool holds_any_alternative(const std::variant<A...>& v) {
@@ -44,7 +44,7 @@ constexpr void for_each_abi_type(F f) {
     std::apply([&f](auto&& ...t) { (f(&t), ...); }, basic_abi_types{});
 }
 
-abi_type* get_type(std::map<std::string, abi_type>& abi_types, const std::string& name, int depth) {
+abi_type* get_type(abi_type_map& abi_types, const std::string& name, int depth) {
     sysio::check(depth < 32, sysio::convert_abi_error(abi_error::recursion_limit_reached));
     auto it = abi_types.find(name);
     if (it == abi_types.end()) {
@@ -113,7 +113,7 @@ abi_type* get_type(std::map<std::string, abi_type>& abi_types, const std::string
     return &it->second;
 }
 
-abi_type::struct_ resolve(std::map<std::string, abi_type>& abi_types, const struct_def* type, int depth) {
+abi_type::struct_ resolve(abi_type_map& abi_types, const struct_def* type, int depth) {
    sysio::check(depth < 32,
         sysio::convert_abi_error(abi_error::recursion_limit_reached));
     abi_type::struct_ result;
@@ -138,7 +138,7 @@ abi_type::struct_ resolve(std::map<std::string, abi_type>& abi_types, const stru
 }
 
 
-abi_type::variant resolve(std::map<std::string, abi_type>& abi_types, const variant_def* type, int depth) {
+abi_type::variant resolve(abi_type_map& abi_types, const variant_def* type, int depth) {
    sysio::check(depth < 32,
         sysio::convert_abi_error(abi_error::recursion_limit_reached));
     abi_type::variant result;
@@ -154,7 +154,7 @@ bool is_integer_type(const std::string& name) {
           name == "uint32" || name == "int32" || name == "uint64" || name == "int64";
 }
 
-abi_type::enum_ resolve(std::map<std::string, abi_type>& abi_types, const enum_def* type, int depth) {
+abi_type::enum_ resolve(abi_type_map& abi_types, const enum_def* type, int depth) {
    sysio::check(depth < 32, sysio::convert_abi_error(abi_error::recursion_limit_reached));
    auto* underlying = get_type(abi_types, type->type, depth + 1);
    sysio::check(is_integer_type(underlying->name),
@@ -165,7 +165,7 @@ abi_type::enum_ resolve(std::map<std::string, abi_type>& abi_types, const enum_d
    return result;
 }
 
-abi_type::alias resolve(std::map<std::string, abi_type>& abi_types, const abi_type::alias_def* type, int depth) {
+abi_type::alias resolve(abi_type_map& abi_types, const abi_type::alias_def* type, int depth) {
     auto t = get_type(abi_types, *type, depth + 1);
     sysio::check(!std::holds_alternative<abi_type::extension>(t->_data),
         sysio::convert_abi_error(abi_error::extension_typedef));
@@ -173,7 +173,7 @@ abi_type::alias resolve(std::map<std::string, abi_type>& abi_types, const abi_ty
 }
 
 struct fill_t {
-   std::map<std::string, abi_type>& abi_types;
+   abi_type_map& abi_types;
    abi_type& type;
    int depth;
    template<typename T>
@@ -186,7 +186,7 @@ struct fill_t {
    }
 };
 
-void fill(std::map<std::string, abi_type>& abi_types, abi_type& type, int depth) {
+void fill(abi_type_map& abi_types, abi_type& type, int depth) {
    return std::visit(fill_t{abi_types, type, depth}, type._data);
 }
 
@@ -201,6 +201,12 @@ void sysio::convert(const abi_def& abi, sysio::abi& c) {
     for (auto& a : abi.actions)
         c.action_types[a.name] = a.type;
     for (auto& t : abi.tables)
+        // Only the primary table_def.type is indexed here. table_def.table_id
+        // and table_def.secondary_indexes are intentionally not consumed:
+        // abieos resolves row data through the primary type alone, and the
+        // secondary index metadata is chain-side state used by nodeop's
+        // table_id namespace isolation. Keep the fields in abi_def so binary
+        // round-trips are faithful, but no serializer is attached here.
         c.table_types[t.name] = t.type;
     for (auto& r : abi.action_results.value)
         c.action_result_types[r.name] = r.result_type;
