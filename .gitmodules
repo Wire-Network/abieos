@@ -1,6 +1,6 @@
-[submodule "external/rapidjson"]
-	path = external/rapidjson
-	url = https://github.com/Wire-Network/rapidjson.git
+; [submodule "external/rapidjson"]
+; 	path = external/rapidjson
+; 	url = https://github.com/Wire-Network/rapidjson.git
 [submodule "external/wirejs-native"]
 	path = external/wirejs-native
 	url = https://github.com/Wire-Network/wirejs-native
